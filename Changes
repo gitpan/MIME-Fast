@@ -1,3 +1,19 @@
+Mon, Jun 18 2003 (1.0.0)
+ * split Fast.xs into separate classes located in Fast/ directory
+ * new filter added - MIME::Fast::Filter::Enriched
+ * new function MIME::Fast::Parser::[sg]et_persist_stream
+ * objects unsupported in gmime (Message-Disposition and Message-MDN)
+   are included but not compiled in (embraced with _UNSUPPORTED macros
+   that can be enabled in Makefile.PL)
+ * fixed a bug in construct_message when method used with parser argument
+ * new enhanced test file t/parser.t
+ * new subdirectory cincluse/ for gmime new functions
+ * cleaned gmime-newfunc.c (set_date_from_string hardencoded info Fast/Message.xs)
+ * new GMimeStreamPerlIO gmime plugin - this is used by the perl module
+   as a default stream for file handles, as well as for all the PerlIO
+   objects.
+ * new function MIME::Fast::Parser::set_header_regex() - a function
+   is called during header parsing when given regex would match
 
 Fri, Jun 13 2003 (0.2.2)
  * fixed a bug with foreach_part method (Thanks to 

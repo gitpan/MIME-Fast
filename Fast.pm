@@ -44,7 +44,7 @@ our @EXPORT = qw(
 	INTERNET_ADDRESS_NAME
 	INTERNET_ADDRESS_GROUP
 );
-our $VERSION = '0.2.2';
+our $VERSION = '1.0.0';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -122,7 +122,7 @@ sub sendmail {
   untie(%headers);
 }
 
-package MIME::Fast::MultiPart;
+package MIME::Fast::Object;
 
 sub is_multipart {
   my $self = shift;
@@ -137,6 +137,8 @@ sub effective_type {
   }
   return lc($type);
 }
+
+package MIME::Fast::MultiPart;
 
 sub get_mime_struct {
   my ($part, $maxdepth, $depth) = @_;

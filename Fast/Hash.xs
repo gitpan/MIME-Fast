@@ -125,7 +125,7 @@ hash_STORE(obj, key, svmixed)
           warn_type(svvalue, "hash_STORE");
 
         /* delete header for the first array item */
-        message_remove_header(msg, key);
+	g_mime_object_remove_header (GMIME_OBJECT(msg), key);
 
         if (svvaltype == SVt_PVAV) {
           AV *	avvalue;
@@ -155,7 +155,7 @@ hash_STORE(obj, key, svmixed)
         } else { /* assume scalar value */
           /* undefined value -> remove header */
           if (!(SvOK(svvalue)))
-            message_remove_header(msg, key);
+	    g_mime_object_remove_header (GMIME_OBJECT(msg), key);
           else if (!(SvPOKp(svvalue)))
             croak("hash_STORE: Unknown sv type: %d for field %s 0x%x/0x%x/0x%x",
               SvTYPE(svvalue), key, &svvalue, &PL_sv_undef, svvalue);
@@ -195,8 +195,8 @@ hash_DELETE(obj, key)
         const gchar *		key
     CODE:
         if (gmime_debug)
-        warn("hash_DELETE %s\n", key);
-        message_remove_header((MIME__Fast__Message) obj->objptr, key);
+          warn("hash_DELETE %s\n", key);
+	g_mime_object_remove_header (GMIME_OBJECT(obj->objptr), key);
 
 void
 hash_NEXTKEY(obj, lastkey = NULL)

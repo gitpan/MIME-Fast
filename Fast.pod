@@ -33,14 +33,18 @@ MIME::Fast - Parsing MIME messages (wrapper for C gmime library)
 
   my %header;
   tie %header, 'MIME::Fast::Hash::Header', $msg;
+  
   $header{'From'} = 'John Doe <john@domain>';
   $header{'X-Info'} = 'Normal one arbitrary header';
   $header{'X-Info'} = ['This is','Multiline X-Info header'];
+  
   print "X-Info: " . $header{'X-Info'};
   print "\n";
   print "X-Info header array: (" . join("; ", @{$header{'X-Info'}}) . ")\n";
+  
   my $old_header = $header{'X-Info'};
   $header{'X-Info'} = [ 'First header', @{$old_header}, 'Last header'];
+
   print "X-Info header array: (" . join("; ", @{$header{'X-Info'}}) . ")\n";
   print "\n";
   print "-- NEW HEADERS:\n";
@@ -63,11 +67,78 @@ is much, much less expensive than calling perl function).
 B<WARNING>: this code is still in beta phase, and interface methods
 could change.
 
+=head1 INHERITANCE
+
+This is a reformatted snipped from the official GMime documentation:
+
+  Not a real objects:
+
+  MIME::Fast::ContentType
+  MIME::Fast::Disposition
+  MIME::Fast::Header
+  MIME::Fast::Param
+  MIME::Fast::Hash::Header    (only in perl module)
+
+  Glib objects:
+
+  MIME::Fast::DataWrapper
+  MIME::Fast::Object
+    MIME::Fast::Message
+    MIME::Fast::MessagePartial
+    MIME::Fast::Multipart
+      MIME::Fast::MultipartEncrypted (not implemented yet)
+      MIME::Fast::MultipartSigned    (not implemented yet)
+    MIME::Fast::Part
+      MIME::Fast::MessagePart
+  MIME::Fast::Parser
+  MIME::Fast::Stream
+    MIME::Fast::StreamBuffer  (used internally)
+    MIME::Fast::StreamCat     (not implemented)
+    MIME::Fast::StreamFile    (used internally)
+    MIME::Fast::StreamFilter  (used internally)
+    MIME::Fast::StreamFs      (used internally)
+    MIME::Fast::StreamMem     (not implemented)
+    MIME::Fast::StreamMmap    (not implemented)
+    MIME::Fast::StreamNull    (not implemented)
+  MIME::Fast::Filter
+    MIME::Fast::FilterBasic
+    MIME::Fast::FilterBest
+    MIME::Fast::FilterCharset
+    MIME::Fast::FilterCRLF
+    MIME::Fast::FilterEnriched
+    MIME::Fast::FilterFrom
+    MIME::Fast::FilterHTML
+    MIME::Fast::FilterMd5
+    MIME::Fast::FilterStrip
+    MIME::Fast::FilterYenc
+  MIME::Fast::CipherContext   (not implemented yet)
+    MIME::Fast::GpgContext    (not implemented yet)
+  MIME::Fast::Session         (not implemented yet)
+    MIME::Fast::SessionSimple (not implemented yet)
+  InternetAddress
+
 =head1 PUBLIC CLASSES
 
 =head2 MIME::Fast::Parser
 
 =over 4
+
+=item I<new>()
+
+=item I<new>(FILE)
+
+=item I<new>($mime_stream)
+
+=item I<new>($mime_datawrapper)
+
+Class method. Create a new MIME::Fast::Message object.
+Such object have no headers or any mime parts.
+If you need to parse any message data use construct_message()
+method from the MIME::Fast::Parser submodule.
+The object is destroyed during the perl garbage collection.
+E.g.:
+
+    my $msg = new MIME::Fast::Message;
 
 =item I<construct_message>(text)
 
@@ -75,11 +146,10 @@ could change.
 
 =item I<construct_message>($mime_stream)
 
+=item I<new>($mime_datawrapper)
+
 Returns a MIME::Fast::Message class based on the given text,
 file handle, or MIME::Fast::Stream object.
-Parameter I<preserve_headers> (default 1) if set to 1,
-means that extra (non standard X-* and unknown) header
-fields would be parsed and remembered, too.
 
 =item I<construct_part>(text)
 
@@ -87,11 +157,64 @@ fields would be parsed and remembered, too.
 
 =item I<construct_part>(mime_stream)
 
-Returns a MIME::Fast::Part class based on the given text,
-file handle, or MIME::Fast::Stream object.
+Returns a MIME::Fast object (part, multipart, message part, etc.)
+class based on the given text, file handle, MIME::Fast::Stream or
+MIME::Fast::DataWrapper object.
 
 B<NOTE>:
-Everything is loaded into the memory.
+If the stream is seekable and persist_stream Parser parameter is TRUE
+(the default) then message is not loaded into memory.
+
+=item I<init_with_stream>($mime_stream)
+
+Initializes parser to use $mime_stream.
+
+B<NOTE>:
+Anything that change state of the stream (offset etc.) is prohibited.
+To test the stream offset you should use MIME::Fast::Parser::tell()
+instead of MIME::Fast::Stream::tell().
+
+=item I<set_persist_stream>(TRUE | FALSE)
+
+=item I<get_persist_stream>()
+
+Sets or gets whether or not the underlying stream is persistant.
+Persistent means that stream content would not be loaded into
+memory if the stream is seekable.
+
+=item I<set_scan_from>(TRUE | FALSE)
+
+=item I<get_scan_from>()
+
+Sets or gets whether or not parser should scan mbox-style From-lines.
+
+=item I<set_header_regex>($regex, $header_cb, $user_data)
+
+Sets the regular expression pattern $regex on parser. Whenever a
+header matching the pattern $regex is parsed, function $header_cb is called
+with $user_data as the user_data argument.
+
+B<NOTE>:
+Regular expression used here is NOT a Perl regex. It is internally
+used with regexec() function.
+
+=item I<tell>
+
+Gets the current stream offset from the parser's internal stream.
+
+=item I<eos>
+
+Tests the end-of-stream indicator for parser's internal stream.
+
+=item I<get_from>
+
+Gets the mbox-style From-line of the most recently parsed message
+(gotten from MIME::Fast::Parser::construct_message()).
+
+=item I<get_from_offset>
+
+Gets the offset of the most recently parsed mbox-style From-line
+(gotten from MIME::Fast::Parser::construct_message()).
 
 =back
 
@@ -181,25 +304,18 @@ Set and get the Message-Id of the message.
 
 =item I<set_header>(field, value)
 
-Add a message header to the MIME Message. This can be
+Set a message header to the MIME Message. This can be
 such headers as X-Mailer, X-Priority, or In-Reply-To
 as well as From etc. If you want to delete
 any header - use remove_header() method.
 
-B<NOTE>: this is different from the C gmime library interface,
-where that function only affects arbitrary headers.
-This method covers gmime add_header() function for
-arbitrary headers.
-
 =item I<add_header>(field, value)
 
-Add an arbitrary header to the message header.
+Add a header to the message header.
 
 =item I<remove_header>(field)
 
 Removes the given field from the message header.
-
-B<NOTE>: this function does not exists in C gmime library.
 
 =item I<get_header>(field)
 
@@ -213,18 +329,9 @@ get_sender (From header), get_content_type (MIME::Fast::Part method), etc.
 =item I<get_mime_part>()
 
 Set and get the root-level MIME part of the message.
-Parameter mime_part should be valid MIME::Fast::Part object.
+Parameter mime_part should be valid MIME::Fast::Object object.
 
 B<NOTE>: get_mime_part() does not exists in C gmime library.
-
-=item I<write_to_stream>(mime_stream)
-
-Writes the contents of the message to a given
-MIME::Fast::Stream object.
-
-=item I<to_string>()
-
-Returns the contents of the MIME Message as a string.
 
 =item I<get_body>(want_plain = 1, is_html = 0)
 
@@ -255,7 +362,7 @@ E.g.:
 
 =item *
 
-MIME::Fast::Header object is unsupported for now. This object contain
+MIME::Fast::Header is a private structure. This structure contains
 all the headers except special ones (Content-* MIME-Version).
 Look for L<Header tied hash> for easy maintaining for header.
 Use also the MIME::Fast::Message::get_header() and set_header() methods.
@@ -272,22 +379,22 @@ Use also the MIME::Fast::Message::get_header() and set_header() methods.
 
 Class method. Create a new MIME::Fast::Part object (MIME part).
 It supports a few special headers (Content-* and MIME-Version),
-and has contents of specified type. MIME part can be of type
-multipart, in which case it can contain other parts (children).
+and has contents of specified type.
 If you do not issue any parameter to the new function,
 "text/plain" would be the default type for the new MIME::Fast::Part object.
+
+
+=item I<set_content_header> ($header)
+
+=item I<get_content_header> ()
+
+Sets or gets an arbitrary MIME content header.
 
 =item I<set_content_description> (description)
 
 =item I<get_content_description> ()
 
 Set and get content description (Content-Description) on the MIME part.
-
-=item I<set_content_id> (content_id)
-
-=item I<get_content_id> ()
-
-Set and get content id (Content-Id) on the MIME part.
 
 =item I<set_content_md5> (content_md5)
 
@@ -302,41 +409,6 @@ Set, get and verify content MD5 hash (Content-MD5) on the MIME part contents.
 =item I<get_content_location> ()
 
 Set and get content location (Content-Location) on the MIME part.
-
-=item I<get_content_length> (method = 0)
-
-Get content length of the MIME part. You can affect the return value with
-the 'method' parameter:
-
-    1 (or GMIME_LENGTH_ENCODED) - encoded content length;
-    2 (or GMIME_LENGTH_CUMULATIVE) - length of all the children
-       parts (if eny);
-
-You can combine the above two constants. By default the return value
-is only the length of the current parsed (already decoded) content.
-E.g.:
-
-    $len = $part->get_content_length();
-    $len = $part->get_content_length(GMIME_LENGTH_ENCODED);
-    $len = $part->get_content_length(3); # same as below
-    $len = $part->get_content_length(GMIME_LENGTH_ENCODED |
-    	GMIME_LENGTH_CUMULATIVE);
-
-B<NOTE>: Encoded content length is only prediction, not the exact number of bytes
-you would get after final encoding. Predicted encoded length is 
-greater or equal to size of the encoded parts, though. The length
-of the part headers is not counted.
-
-=item I<set_content_type> (type)
-
-=item I<get_content_type> ()
-
-Set and get content type on the message. The 'type' parameter
-should be a MIME::Fast::ContentType object.
-E.g.
-
-    $type = $part->get_content_type;
-    print "Type of $part is " . $type->to_string;
 
 =item I<set_encoding> (encoding)
 
@@ -359,6 +431,10 @@ E.g.
     MIME::Fast::Part::encoding_to_string("GMIME_PART_ENCODING_BASE64");
 
 =item I<set_content_disposition> (disposition)
+
+=item I<set_content_disposition_object> (MIME::Fast::Disposition)
+
+=item I<get_content_disposition> ()
 
 =item I<get_content_disposition> ()
 
@@ -383,12 +459,6 @@ header, and 'name' parameter to the Content-Type header.
 Get filename suggested by the MIME part headers (either from the
 Content-Disposition or Content-Type header).
 
-=item I<set_boundary> (boundary)
-
-=item I<get_boundary> ()
-
-Set and get boundary on the MIME part.
-
 =item I<set_content> (content_object)
 
 Set content of the MIME part based on the supplied argument (text
@@ -409,44 +479,54 @@ Set pre-encoded content on the MIME part. The 'encoding'
 parameter can have values described in encoding_to_string() function above.
 These function are used by the parser. You can write your own.
 
-=item I<add_subpart> (subpart)
+=back
 
-Add the subpart to the multipart (obligatory) MIME part.
+=head2 MIME::Fast::MultiPart
 
-=item I<write_to_stream> (mime_stream)
+=over 4
 
-Write the MIME part contents to the given MIME stream object.
+=item I<new> ()
 
-=item I<to_string> ()
+=item I<new> (type = "text", subtype = "plain")
 
-Get the MIME part contents (with children).
+Class method.
+Creates a new MIME::Fast::MultiPart object with a default content-type of
+multipart/mixed.
 
-=item I<foreach_part> (callback, data)
+=item I<set_preface> (text)
 
-Call the given subroutine for the MIME part and its subparts (if any).
-The 'data' parameter would be forwarded to the called function.
-E.g.
+=item I<get_preface> ()
 
-    sub mime_sub {
-      my ($mime, $data) = @_;
-      my $type = $mime->get_content_type;
-      $type = $type->to_string;
-      print "mime_sub($mime): type $type\n";
-    };
+Sets or gets the preface on the multipart.
 
-    $part->foreach_part(\&mime_sub, "none");
+=item I<set_postface> (text)
+
+=item I<get_postface> ()
+
+Sets or gets the postface on the multipart.
+
+=item I<set_boundary> (boundary)
+
+=item I<get_boundary> ()
+
+Set and get boundary on the MIME part.
+
+=item I<get_number> ()
+
+Gets the number of mime parts contained within the multipart.
+
+=item I<add_part> (MIME::Fast::Object, $index = 0)
+
+Adds a mime part to the multipart at the position $index.
+
+=item I<remove_part> (MIME::Fast::Object | $index = 0)
+
+Remove child part from the MIME part or remove child
+part at the position $index.
 
 =item I<get_subpart_from_content_id> (content_id)
 
 Get subpart (MIME::Fast::Part object) for the given Content-Id header value.
-
-=item I<remove_subpart> (child)
-
-=item I<remove_child> (child)
-
-Remove child part from the MIME part. This is used in case you
-want to call MIME part, when its parent MIME part is already
-destroyed (in which case the extracted part would not exists).
 
 =item I<children>
 
@@ -495,9 +575,115 @@ The function can return MIME::Fast::Part, MIME::Fast::MultiPart,
 MIME::Fast::MessagePartial, MIME::Fast::MessagePart or
 any other MIME::Fast::Object object.
 
+=item I<foreach_part> (callback, data)
+
+Call the given subroutine for the MIME part and its subparts (if any).
+The 'data' parameter would be forwarded to the called function.
+E.g.
+
+    sub mime_sub {
+      my ($mime, $data) = @_;
+      my $type = $mime->get_content_type;
+      $type = $type->to_string;
+      print "mime_sub($mime): type $type\n";
+    };
+
+    $part->foreach_part(\&mime_sub, "none");
+
+
+=back
+
+=head2 MIME::Fast::Object
+
+=over 4
+
+This is the base class for MIME::Fast objects (messages,
+parts, multiparts, filters, streams etc.). 
+
+=item I<set_content_type> ($type)
+
+=item I<get_content_type> ()
+
+Set and get content type on the MIME::Fast::Object. The 'type' parameter
+should be a MIME::Fast::ContentType object.
+E.g.
+
+    $type = $part->get_content_type;
+    print "Type of $part is " . $type->to_string;
+
+=item I<set_content_type_parameter> ($name, $value)
+
+=item I<get_content_type_parameter> ($name)
+
+Sets or gets the value of the content-type param $name set on the MIME part object.
+
+=item I<set_content_id> (content_id)
+
+=item I<get_content_id> ()
+
+Set and get content id (Content-Id) on the MIME part object.
+
+=item I<set_header>(field, value)
+
+Set a message header to the MIME object.
+
+=item I<add_header>(field, value)
+
+Add a header field to the MIME object header.
+
+=item I<remove_header>(field)
+
+Removes the given field from the header.
+
+=item I<get_header>(field)
+
+Gets the value of the requested header.
+
+=item I<get_content_length> ($method = 0)
+
+Get content length of the MIME object. You can affect the return value with
+the 'method' parameter:
+
+    1 (or GMIME_LENGTH_ENCODED) - encoded content length;
+    2 (or GMIME_LENGTH_CUMULATIVE) - length of all the children
+       parts (if any);
+
+You can combine the above two constants. By default the return value
+is only the length of the current parsed (already decoded) content.
+E.g.:
+
+    $len = $part->get_content_length();
+    $len = $part->get_content_length(GMIME_LENGTH_ENCODED);
+    $len = $part->get_content_length(3); # same as below
+    $len = $part->get_content_length(GMIME_LENGTH_ENCODED |
+    	GMIME_LENGTH_CUMULATIVE);
+
+B<NOTE>: This methoid does not exists in the C gmime.
+
+B<NOTE>: Encoded content length is only prediction, not the exact number of bytes
+you would get after final encoding. Predicted encoded length is 
+greater or equal to size of the encoded parts, though. The length
+of the part/message headers is not counted.
+
 =item I<is_multipart> ()
 
-Returns 1 if the MIME part is of type multipart, 0 otherwise.
+Returns 1 if the MIME object is of type multipart, 0 otherwise.
+
+B<NOTE>: This methoid does not exists in the C gmime.
+
+=item I<effective_type> ()
+
+Returns content type of the given object as a lowercase text string.
+
+B<NOTE>: This methoid does not exists in the C gmime.
+
+=item I<write_to_stream> ($mime_stream_dst)
+
+Writes the contents of the MIME object to a MIME stream.
+
+=item I<to_string>()
+
+Returns the contents of the MIME object as a string.
 
 =back
 
@@ -560,13 +746,19 @@ or from the given string.
 E.g.
     $param = new MIME::Fast::Param('name="test.gif"');
 
-=item I<to_string> ()
+=item I<append> (name, value)
 
-Get the string representation for the MIME::Fast::Param object.
-E.g.
+Appends a new parameter with name $name and value $value to the
+parameter list.
 
-    print 'Param: ' . $param->to_string . "\n";
-    Param: name="test.gif"
+=item I<append_param> (MIME::Fast::Param)
+
+Appends $param object to the param list.
+
+=item I<write_to_string> ($fold, $string)
+
+Assumes the output string $string contains only the Content-* header and
+it's immediate value. Argument $fold specifies whether or not to fold headers.
 
 =back
 
@@ -589,6 +781,14 @@ E.g.
 =item I<header_format_date> (time, offset)
 
 Returns a valid string representation of the date.
+
+=item I<generate_message_id> (fqdn)
+
+Generates a unique string in an addr-spec format suitable for use as a Message-Id.
+
+=item I<decode_message_id> (message_id)
+
+Decodes a msg-id as defined by rfc822.
 
 =item I<header_fold> (headers)
 
@@ -642,10 +842,6 @@ addresses.
 Creates new MIME::Fast::DataWrapper object. Optional arguments
 are MIME stream object and encoding type.
 
-=item I<write_to_stream> (mime_stream_dst)
-
-Writes the contents of the MIME data-wrapper to a MIME stream.
-
 =item I<set_stream> (mime_stream)
 
 Replaces the wrapper's internal stream.
@@ -694,9 +890,58 @@ Writes a string I<str> to the MIME stream.
 
 Writes the contents of the source MIME stream to the destination MIME stream.
 
+=back
+
+Low level MIME::Stream manipulation:
+
+=over 4
+
+=item I<eos> (mime_stream)
+
+Tests the end-of-stream indicator for strem.
+
+=item I<reset> (mime_stream)
+
+Resets the stream.
+
+=item I<seek> (mime_stream, offset, whence)
+
+Repositions the offset of the stream to the argument $offset
+to the directive $whence as follows:
+
+    GMIME_STREAM_SEEK_SET: The offset is set to $offset bytes.
+    GMIME_STREAM_SEEK_CUR: The offset is set to its current
+      location plus $offset bytes.
+    GMIME_STREAM_SEEK_END: The offset is set to the size of the
+      stream plus $offset bytes.
+
+Returns the resultant position on success or -1 on fail.
+ 
+=item I<tell> (mime_stream)
+
+Gets the current offset within the stream.
+
 =item I<length> (mime_stream)
 
 Returns length of the MIME stream.
+
+=item I<read> (mime_stream, buf, len)
+
+Attempts to read up to $len bytes from stream into $buf.
+Returns number of bytes read.
+
+=item I<write> (mime_stream, buf, len)
+
+Attempts to write up to $len bytes of $buf to stream.
+Returns number of bytes written.
+
+=item I<flush> (mime_stream)
+
+Sync's the stream to disk. Returns 0 on success or -1 on fail.
+
+=item I<close> (mime_stream)
+
+Closes the stream. Returns 0 on success or -1 on fail.
 
 =back
 
@@ -742,8 +987,9 @@ Add a member to the group MIME::Fast::InternetAddress object.
 
 =item I<type> ()
 
-Returns the type of MIME::Fast::InternetAddress object - either
-INTERNET_ADDRESS_NAME or INTERNET_ADDRESS_GROUP (group object).
+Returns the type of MIME::Fast::InternetAddress object -
+INTERNET_ADDRESS_NAME or INTERNET_ADDRESS_GROUP (group object),
+or INTERNET_ADDRESS_NONE.
 
 =back
 
@@ -762,6 +1008,322 @@ this function.
 =item I<locale_name> ()
 
 Returns the user's locale charset (iso-8859-1 is default).
+
+=item I<map_init> ()
+
+Initializes the locale charset variable for later calls.
+Only really needs to be called for non-iso-8859-1 locales.
+
+=item I<language> ()
+
+Returns a language code that is specific to charset.
+
+B<NOTE>: this function is not yet available in gmime 2.0.8.
+
+=item I<best_name> ()
+
+Gets the best charset name based on the charset mask.
+Returns string containing the best charset name that
+can represent the charset mask.
+
+=item I<best> ()
+
+Computes the best charset to use to encode this text buffer.
+Returns the charset name best suited for the input text
+or undef if it is US-ASCII safe.
+
+=back
+
+=head2 MIME::Fast::MessagePart
+
+=over 4
+
+=item I<new> (subtype = "rfc822" [, message])
+
+Creates a new MIME message part object with a default content-type
+of message/$subtype (optionally containing $message object).
+
+=item I<set_message> (message)
+
+=item I<get_message> ()
+
+Sets or gets the MIME::Fast::Message object on the message part object.
+
+=back
+
+=head2 MIME::Fast::MessagePartial
+
+=over 4
+
+=item I<new> ()
+
+Creates a new MIME message/partial object.
+
+=item I<get_id> ()
+
+Gets the message/partial id parameter value (or undef on fail).
+
+=item I<get_number> ()
+
+Gets the message/partial part number (or -1 on fail).
+
+=item I<get_total> ()
+
+Gets the total number of message/partial parts needed to
+reconstruct the original message (or -1 on fail).
+
+=item I<reconstruct_message> (@partials)
+
+Reconstructs the MIME::Fast::Message object from the given message/partial parts
+(the array of MIME::Fast::MessagePartial or MIME::Fast::Message objects).
+
+=item I<split_message> (message, max_size)
+
+Splits message into an array of MIME::Fast::Message objects each
+containing a single MIME::Fast::MessagePartial object containing
+$max_size bytes or fewer.
+
+=back
+
+=head2 MIME::Fast::Disposition
+
+=over 4
+
+=item I<new> (disposition)
+
+Creates a new MIME::Fast::Disposition object from the $disposition string.
+
+=item I<set> (value)
+
+Sets the disposition to $value which may be one of
+GMIME_DISPOSITION_ATTACHMENT or GMIME_DISPOSITION_INLINE or, by your
+choice, any other string which would indicate how the MIME part
+should be displayed by the MUA.
+
+=item I<get> ()
+
+Returns the disposition string which is probably one of
+GMIME_DISPOSITION_ATTACHMENT or GMIME_DISPOSITION_INLINE.
+
+=item I<add_parameter> (name, value)
+
+Adds a new parameter of name $name and value $value to the
+disposition.
+
+=item I<get_parameter> (name)
+
+Gets the value of the parameter $name.
+
+=item I<header> (fold)
+
+Returns a string containing the disposition header
+(if $fold is TRUE, then header is optionally folded).
+
+=back
+
+=head2 MIME::Fast::StreamFilter
+
+=over 4
+
+=item I<new> (mime_stream)
+
+Creates a new MIME::Fast::Stream::Filter object using 
+stream as the source stream.
+
+=item I<add> (filter)
+
+Adds a MIME::Fast::Filter to stream.
+Returns an id for the filter.
+
+=item I<remove> (filter)
+
+Removed a filter from the stream based on the id (as returned from
+$streamfilter->add).
+
+=back
+
+=head2 MIME::Fast::Filter
+
+Base class for the other filter classes.
+
+=over 4
+
+=item I<copy> ()
+
+Returns a duplicate of the filter.
+
+=item I<reset> ()
+
+Resets a filter.
+
+=item I<set_size> (size, keep)
+
+Ensure this much size available for filter output (if required).
+If $keep is 1 then current buffered data is preserved.
+
+=back
+
+=head2 MIME::Fast::Filter::Basic
+
+=over 4
+
+=item I<> ($type)
+
+Creates a new filter of $type:
+GMIME_FILTER_BASIC_BASE64_ENC, GMIME_FILTER_BASIC_BASE64_DEC,
+GMIME_FILTER_BASIC_QP_ENC, GMIME_FILTER_BASIC_QP_DEC,
+GMIME_FILTER_BASIC_UU_ENC, GMIME_FILTER_BASIC_UU_DEC.
+
+=back
+
+=head2 MIME::Fast::Filter::Best
+
+=over 4
+
+=item I<new> (flags)
+
+Creates a new MIME::Fast::Filter::Best filter. $flags are used to determine
+which information to keep statistics of. If the GMIME_FILTER_BEST_CHARSET bit
+is set, the filter will be able to compute the best charset for encoding the
+stream of data filtered. If the GMIME_FILTER_BEST_ENCODING bit is set, the
+filter will be able to compute the best Content-Transfer-Encoding for use
+with the stream being filtered.
+
+Note: In order for the MIME::Fast::Filter::Best::charset() function to work,
+the stream being filtered MUST already be encoded in UTF-8.
+
+=item I<charset> ()
+
+Calculates the best charset for encoding the stream.
+
+=item I<encoding> (required)
+
+Calculates the best Content-Transfer-Encoding for the stream
+filtered through $best that fits within the $required encoding.
+$required arguments can have the following values:
+GMIME_BEST_ENCODING_7BIT, GMIME_BEST_ENCODING_8BIT,
+GMIME_BEST_ENCODING_BINARY.
+
+=back
+
+=head2 MIME::Fast::Filter::Charset
+
+=over 4
+
+=item I<new> (from_charset, to_charset)
+
+Creates a new MIME::Fast::Filter::Charset filter.
+
+=back
+
+=head2 MIME::Fast::Filter::CRLF
+
+=over 4
+
+=item I<new> (direction, mode)
+
+$direction argument can have the following values:
+GMIME_FILTER_CRLF_ENCODE, GMIME_FILTER_CRLF_DECODE.
+$mode argument can have the following values:
+GMIME_FILTER_CRLF_MODE_CRLF_DOTS, GMIME_FILTER_CRLF_MODE_CRLF_ONLY.
+Returns a new crlf(/dot) filter.
+
+=back
+
+=head2 MIME::Fast::Filter::Enriched
+
+=over 4
+
+=item I<new> (flags = 0)
+
+Creates a new MIME::Fast::Filter::Enriched filter.
+This filter can be used to convert text/enriched and text/rtf to text/html.
+optional $flags argument can have the following values:
+GMIME_FILTER_ENRICHED_IS_RICHTEXT (if the content is already enriched).
+
+B<NOTE>:
+The MIME::Fast::Filter::Enriched filter is not yet available in gmime 2.0.8.
+
+=back
+
+=head2 MIME::Fast::Filter::From
+
+=over 4
+
+=item I<new> (mode)
+
+
+Creates a new GMimeFilterFrom filter. If $mode is
+GMIME_FILTER_FROM_MODE_ARMOR, the from-filter will encode from
+lines using the quoted-printable encoding resulting in "=46rom ".
+Using the GMIME_FILTER_FROM_MODE_DEFAULT or
+GMIME_FILTER_FROM_MODE_ESCAPE mode (they are the same), from lines
+will be escaped to ">From ".
+
+Note: If you plan on using a from-filter in mode ARMOR, you should
+remember to also use a MIME::Fast::Filter::Basic filter with mode
+GMIME_FILTER_BASIC_QP_ENC.
+
+=back
+
+=head2 MIME::Fast::Filter::HTML
+
+=over 4
+
+=item I<new> (flags, colour)
+
+Creates a new MIME::Fast::Filter::HTML filter which can be used to convert a
+plain UTF-8 text stream into an html stream.
+$flags argument can have the following values:
+
+  GMIME_FILTER_HTML_PRE          Wrap stream in <pre> tags
+  GMIME_FILTER_HTML_CONVERT_NL   Convert new-lines ('\n') into <br> tags.
+  GMIME_FILTER_HTML_CONVERT_SPACES Preserve whitespace by converting spaces
+    into their appropriate html entities.
+  GMIME_FILTER_HTML_CONVERT_URLS Wrap detected URLs in <a href=...> tags.
+  GMIME_FILTER_HTML_MARK_CITATION Change the colour of citation text.
+  GMIME_FILTER_HTML_CONVERT_ADDRESSES Wrap email addresses in "mailto:" href tags.
+  GMIME_FILTER_HTML_ESCAPE_8BIT Converts 8bit characters to '?'.
+  GMIME_FILTER_HTML_CITE        Cites text by prepending "> " to each cited line.
+
+Gmime version 2.0.8 supports only one colour for citation text.
+
+=back
+
+=head2 MIME::Fast::Filter::Md5
+
+=over 4
+
+=item I<new> ()
+
+Creates a new Md5 filter.
+
+=item I<get_digest> ()
+
+Returns MD5 digest.
+
+=back
+
+=head2 MIME::Fast::Filter::Strip
+
+=over 4
+
+=item I<new> ()
+
+Returns a new strip filter (for stripping whitespaces from the beggining and
+end of the lines).
+
+=back
+
+=head2 MIME::Fast::Filter::Yenc
+
+=over 4
+
+=item I<new> (direction)
+
+Creates a new yEnc filter.
+$direction argument can have the following values:
+GMIME_FILTER_YENC_DIRECTION_ENCODE, GMIME_FILTER_YENC_DIRECTION_DECODE.
 
 =back
 
@@ -808,34 +1370,15 @@ E.g.
     INTERNET_ADDRESS_NAME
     INTERNET_ADDRESS_GROUP
 
-=head1 UNDOCUMENTED
-
-Undocumented yet are new objects:
-     + MIME::Fast::Object
-     + MIME::Fast::MessagePart
-     + MIME::Fast::MessagePartial
-     + MIME::Fast::Disposition
-     + MIME::Fast::StreamFilter
-     + MIME::Fast::Filter::Basic
-     + MIME::Fast::Filter::Best
-     + MIME::Fast::Filter::Charset
-     + MIME::Fast::Filter::CRLF
-     + MIME::Fast::Filter::From
-     + MIME::Fast::Filter::HTML
-     + MIME::Fast::Filter::Md5
-     + MIME::Fast::Filter::Strip
-     + MIME::Fast::Filter::Yenc
-     + MIME::Fast::Charset
-
 =head1 REQUIREMENTS
 
-This module MIME::Fast version 0.2 requires perl 5.8.x and gmime 2.0.8.
+This module MIME::Fast requires perl 5.8.x and gmime 2.0.8 or higher.
 
 =head1 DEVELOPMENT
 
-If something goes wrong, you can edit Fast.xs file, and set
-gmime_debug static variable to 1, to see some debug messages
-during object creation destruction etc.
+If something goes wrong, you can edit Fast.xs file, and recompile
+gmime_debug static variable set to 1, to see some debug messages
+during object creation, destruction etc.
 
 =head1 BUGS
 

@@ -21,6 +21,7 @@ MIME::Fast::InternetAddressType		T_IV
 MIME::Fast::BestEncoding		T_IV
 MIME::Fast::FilterFromMode		T_IV
 Mime::Fast::FilterYencDirection		T_IV
+MIME::Fast::SeekWhence			T_IV
 
 # types
 MIME::Fast::Object			T_PTROBJ
@@ -48,6 +49,7 @@ MIME::Fast::Filter::Charset		T_PTROBJ
 MIME::Fast::Filter::CRLF		T_PTROBJ
 MIME::Fast::Filter::From		T_PTROBJ
 MIME::Fast::Filter::Func		T_PTROBJ
+MIME::Fast::Filter::Enriched		T_PTROBJ
 MIME::Fast::Filter::HTML		T_PTROBJ
 MIME::Fast::Filter::Md5			T_PTROBJ
 MIME::Fast::Filter::Strip		T_PTROBJ
