@@ -1,0 +1,14 @@
+Changes
+Fast.pm
+Fast.xs
+Fast.pod
+MANIFEST
+README
+COPYING
+Makefile.PL
+t/message.t
+typemap
+gmime-newfunc.c
+gmime-newfuncheader.c
+test.eml
+
