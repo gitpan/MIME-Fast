@@ -1,7 +1,7 @@
-Thu, Oct 16 2003 (1.3)
- * no changes to the sources at all (just the documentation and Makefile.PL):
-   - add link to gmime library to the README file
-   - perl Makefile.PL would stop running if it fails to find gmime library
+Thu, Oct 16 2003 (1.4)
+ * add link to gmime library to the README file
+ * perl Makefile.PL would stop running if it fails to find gmime library
+ * new filter: MIME::Fast::Filter::Windows
 
 Wed, Oct 15 2003 (1.2)
  * fixed problem with enriched filter when compiled with gmime-2.1.0 (Thanks to Patel, Rupen)
