@@ -280,7 +280,6 @@ g_mime_part_get_content(mime_part)
         guint len;
         const char * content_char;
         SV * content;
-
     CODE:
     /*
         content_char = g_mime_part_get_content(mime_part, &len);

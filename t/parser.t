@@ -1,6 +1,6 @@
 
 use strict;
-use Test::More tests => 31;
+use Test::More tests => 32;
 
 BEGIN { use_ok( 'MIME::Fast' ); }
 
@@ -36,7 +36,23 @@ undef $str;
 seek(M, 0, 0) || die "$!";
 $str = new MIME::Fast::Stream(\*M);
 
+#
+# Testing parsing and header callback
+# ---------------------------------------
+
 $parser->init_with_stream($str);
+$parser->set_header_regex ('^F', sub {
+    cmp_ok($_[1],'=~',/^From/,"From: header found");
+    # print 'REGEX -' . join(":",@_) . "-\n";
+  }, ' test regex header');
+
+#sub x {
+#  print 'REGEX: ' . join(":",@_) . ":\n";
+#};
+
+#$parser->set_header_regex ('^F', \&x,
+#  ' test regex header');
+
 $msg = $parser->construct_message();
 isa_ok($msg, 'MIME::Fast::Message');
 isa_ok($msg, 'MIME::Fast::Object');

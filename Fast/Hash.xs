@@ -3,7 +3,7 @@ MODULE = MIME::Fast		PACKAGE = MIME::Fast::Hash::Header		PREFIX=hash_
 
 MIME::Fast::Hash::Header
 hash_TIEHASH(Class, objptr)
-        gchar *			Class
+        char *			Class
         MIME::Fast::Message		objptr
     PREINIT:
         hash_header *		hash;
@@ -30,10 +30,9 @@ hash_DESTROY(obj)
 void
 hash_FETCH(obj, key)
         MIME::Fast::Hash::Header	obj
-        const gchar *		key
+        const char *		key
     PREINIT:
         MIME__Fast__Message		msg;
-        gchar *			ret;
         GList			*gret = NULL, *item;
         AV *			retav;
         I32			gimme = GIMME_V;
@@ -63,19 +62,19 @@ hash_FETCH(obj, key)
           XSRETURN(0);
         } else {
           if (gret->next == NULL) { // one value
-            XPUSHs(sv_2mortal(newSVpv((gchar *)(gret->data),0)));
+            XPUSHs(sv_2mortal(newSVpv((char *)(gret->data),0)));
           } else {
             if (gimme == G_ARRAY) {
               item = gret;
               while (item && item->data) {
-                XPUSHs(sv_2mortal(newSVpv((gchar *)(item->data),0)));
+                XPUSHs(sv_2mortal(newSVpv((char *)(item->data),0)));
                 item = item->next;
               }
             } else if (gimme == G_SCALAR) {
               retav = newAV();
               item = gret;
               while (item && item->data) {
-                av_push(retav, newSVpv((gchar *)g_strdup((item->data)), 0));
+                av_push(retav, newSVpv((char *)g_strdup((item->data)), 0));
                 item = item->next;
               }
               XPUSHs(newRV_noinc((SV *)retav));
@@ -86,7 +85,7 @@ hash_FETCH(obj, key)
           item = gret;
           while (item) {
             if (item->data)
-              g_free((gchar *)(item->data));
+              g_free((char *)(item->data));
             item = item->next;
           }
           g_list_free(gret);
@@ -95,12 +94,11 @@ hash_FETCH(obj, key)
 void
 hash_STORE(obj, key, svmixed)
         MIME::Fast::Hash::Header	obj
-        const gchar *		key
+        const char *		key
         SV *			svmixed
     PREINIT:
         MIME__Fast__Message		msg;
-        gchar *			value;
-        AV *			avvalue;
+        char *			value;
         SV *			svvalue;
         svtype			svvaltype;
         STRLEN			vallen;
@@ -145,12 +143,12 @@ hash_STORE(obj, key, svmixed)
             }
             
             if (svtmp && SvPOKp(svtmp)) {
-              value = (gchar *)SvPV(svtmp, vallen);
+              value = (char *)SvPV(svtmp, vallen);
               message_set_header(msg, key, value);
             }
           }
         } else if (SvPOK(svvalue) || SvIOK(svvalue) || SvNOK(svvalue)) {
-          value = (gchar *)SvPV(svvalue, vallen);
+          value = (char *)SvPV(svvalue, vallen);
           message_set_header(msg, key, value);
         } else { /* assume scalar value */
           /* undefined value -> remove header */
@@ -166,10 +164,9 @@ hash_STORE(obj, key, svmixed)
 gboolean
 hash_EXISTS(obj, key)
         MIME::Fast::Hash::Header	obj
-        const gchar *		key
+        const char *		key
     PREINIT:
         MIME__Fast__Message		msg;
-        gchar *			ret;
         GList			*gret, *item;
     CODE:
         msg = obj->objptr;
@@ -181,7 +178,7 @@ hash_EXISTS(obj, key)
           item = gret;
           while (item) {
             if (item->data)
-              g_free((gchar *)(item->data));
+              g_free((char *)(item->data));
             item = item->next;
           }
           g_list_free(gret);
@@ -192,7 +189,7 @@ hash_EXISTS(obj, key)
 void
 hash_DELETE(obj, key)
         MIME::Fast::Hash::Header	obj
-        const gchar *		key
+        const char *		key
     CODE:
         if (gmime_debug)
           warn("hash_DELETE %s\n", key);
@@ -201,12 +198,12 @@ hash_DELETE(obj, key)
 void
 hash_NEXTKEY(obj, lastkey = NULL)
         MIME::Fast::Hash::Header	obj
-        const gchar *		lastkey
+        const char *		lastkey
     ALIAS:
         MIME::Fast::Hash::Header::FIRSTKEY = 1
     PREINIT:
-        gchar *			key = NULL;
-        gchar *			value = NULL;
+        char *			key = NULL;
+        char *			value = NULL;
         MIME__Fast__Message		msg;
         I32			gimme = GIMME_V;
         gint			i, j, found;
@@ -245,7 +242,7 @@ hash_NEXTKEY(obj, lastkey = NULL)
         if (gimme != G_SCALAR && !value) {
           // TODO: does each, keys, retrieves the value?
           // retrieve the value
-          warn("Error: NEED TO RETRIEVE THE VALUE, contact the author\n");
+          warn("Error in hash_NEXTKEY: NEED TO RETRIEVE THE VALUE, contact the author\n");
         }
         
         /* THE HACK - FETCH method would get value indirectly */
@@ -273,9 +270,7 @@ hash_CLEAR(obj)
         MIME::Fast::Hash::Header	obj
     PREINIT:
         MIME__Fast__Message		message;
-        gint			i;
         local_GMimeHeader		*header;
-        struct raw_header	*h;
     CODE:
         message = obj->objptr;
         if (gmime_debug)

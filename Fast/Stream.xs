@@ -97,8 +97,6 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
         off_t		start
         off_t		end
     PREINIT:
-        STRLEN		len;
-        char *		data;
         GMimeStream	*mime_stream = NULL;
         svtype		svvaltype;
         SV *		svval;
@@ -196,8 +194,8 @@ g_mime_stream_write_to_stream(mime_stream_src, svstream)
     PREINIT:
         GMimeStream *		mime_stream_dst;
     CODE:
-	if (sv_derived_from(ST(1), "MIME::Fast::Stream")) {
-	    IV tmp = SvIV((SV*)SvRV(ST(1)));
+	if (sv_derived_from(svstream, "MIME::Fast::Stream")) {
+	    IV tmp = SvIV((SV*)SvRV(svstream));
 	    mime_stream_dst = INT2PTR(MIME__Fast__Stream,tmp);
 	}
 	else

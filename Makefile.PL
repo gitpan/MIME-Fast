@@ -29,7 +29,8 @@ WriteMakefile(
     'VERSION_FROM'	=> 'Fast.pm', # finds $VERSION
     'PREREQ_PM'		=> {},
     'LIBS'		=> [$libs], # e.g., '-lm'
-    'OPTIMIZE'		=> '-g -O',
+    'OPTIMIZE'          => '-O2',
+    'CCFLAGS'           => '-g',
     'DEFINE'		=> '', # e.g., '-DHAVE_SOMETHING'
     'XS'		=> { 'Fast.xs'  => 'Fast.c' },
     'OBJECT'		=> 'Fast.o gmime-stream-perlio.o',

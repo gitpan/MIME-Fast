@@ -28,14 +28,12 @@
 extern "C" {
 #pragma }
 #endif /* __cplusplus */
+
+#include <EXTERN.h>
+#include <perl.h>
  
 #include <glib.h>
-#include <stdio.h>
 #include <gmime/gmime-stream.h>
-
-#include "EXTERN.h"
-#include "perl.h"
-#include "XSUB.h"
 
 #define GMIME_TYPE_STREAM_PERLIO            (g_mime_stream_perlio_get_type ())
 #define GMIME_STREAM_PERLIO(obj)            (GMIME_CHECK_CAST ((obj), GMIME_TYPE_STREAM_PERLIO, GMimeStreamPerlIO))

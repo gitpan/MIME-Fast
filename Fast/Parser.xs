@@ -255,7 +255,6 @@ g_mime_parser_construct_part(svmixed)
     PREINIT:
         STRLEN		len;
         char *		data;
-        GMimePart	*mime_part = NULL;
         GMimeObject	*mime_object = NULL;
         GMimeStream	*mime_stream = NULL;
         GMimeParser *parser = NULL;
@@ -412,12 +411,12 @@ g_mime_parser_set_header_regex(parser, regex, callback, svdata)
 	SV *			callback
 	SV *			svdata
     PREINIT:
-	struct _user_data_sv    *data;
 	HV *			rh;
     CODE:
-	rh = (HV *)sv_2mortal((SV *)newHV());
-	hv_store(rh, "user_data", 0, newSVsv(svdata), 0);
-	hv_store(rh, "func", 0, newSVsv(callback), 0);
+	// rh = (HV *)sv_2mortal((SV *)newHV());
+	rh = newHV();
+	hv_store(rh, "user_data", 9, newSVsv(svdata), 0);
+	hv_store(rh, "func", 4, newSVsv(callback), 0);
         g_mime_parser_set_header_regex(parser, regex, call_sub_header_regex, newRV((SV *)rh));
 
  # position

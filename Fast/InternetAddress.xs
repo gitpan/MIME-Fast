@@ -45,6 +45,7 @@ internet_address_parse_string(str)
         AV * 		retav;
     CODE:
         addrlist = internet_address_parse_string(str);
+	retav = newAV();
         while (addrlist) {
           SV * address = newSViv(0);
           sv_setref_pv(address, "MIME::Fast::InternetAddress", (MIME__Fast__InternetAddress)(addrlist->address));

@@ -84,7 +84,7 @@ SV *
 g_mime_multipart_get_part(mime_multipart, ...)
         MIME::Fast::MultiPart	mime_multipart
     PREINIT:
-        int		i, count = 0;
+        int		i;
         IV		partnum = -1;
 	GMimeMultipart  *part;
 	GMimeObject     *mime_object;
@@ -278,7 +278,6 @@ children(mime_multipart, ...)
         MIME::Fast::MultiPart::parts = 1
     PREINIT:
         GList *		child;
-        AV * 		retav;
         IV		partnum = -1;
         I32		gimme = GIMME_V;
         gint		count = 0;

@@ -15,7 +15,6 @@ enum {
 static GList *
 local_message_get_header(GMimeMessage *message, const char *field)
 {
-    GMimeHeader *header;
     struct raw_header *h;
     GList *	gret = NULL;
 
@@ -114,7 +113,7 @@ message_set_header(GMimeMessage *message, const char *field, const char *value) 
     warn("message_set_header(msg=0x%x, '%s' => '%s')\n", message, field, value);
 
   if (!g_strcasecmp (field, "MIME-Version:") || !g_strncasecmp (field, "Content-", 8)) {
-    warn ("Could not set special header yet: \"%s\"", field);
+    warn ("Could not set special header: \"%s\"", field);
     return;
   }
   for (i=0; i<=HEADER_UNKNOWN; ++i) {
@@ -164,17 +163,11 @@ message_get_header(GMimeMessage *message, const char *field) {
 	  ret = (char *)(*(fieldfunc[i].func))(message);
 	  break;
 	case FUNC_IA: {
-	    GList *item, *gretcopy;
 	    InternetAddressList *ia_list = NULL, *ia;
 	    
-	    warn("a m=0x%x f=%s\n", message, field);
             ia_list = (*(fieldfunc[i].rcptfunc))(message, field);
-	    warn("a 0x%x\n", ia_list);
 	    gret = g_list_alloc();
-	    warn("b 0x%x\n", gret);
 	    ia = ia_list;
-	    // gret = item;
-	    warn("cbefore 0x%x\n", gret);
 	    while (ia && ia->address) {
 	      char *ia_string;
 
@@ -182,7 +175,6 @@ message_get_header(GMimeMessage *message, const char *field) {
 	      gret = g_list_append(gret, ia_string);
 	      ia = ia->next;
 	    }
-	    warn("cout 0x%x\n", gret);
 	  }
 	  break;
 	case FUNC_LIST:

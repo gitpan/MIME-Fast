@@ -20,12 +20,11 @@
  *
  */
 
-
-#ifdef HAVE_CONFIG_H
-#include <config.h>
-#endif
+#define PERL_NO_GET_CONTEXT     /* we want efficiency */
 
 #include "gmime-stream-perlio.h"
+
+// static PerlInterpreter *my_perl;
 
 static void g_mime_stream_perlio_class_init (GMimeStreamPerlIOClass *klass);
 static void g_mime_stream_perlio_init (GMimeStreamPerlIO *stream, GMimeStreamPerlIOClass *klass);
@@ -105,6 +104,8 @@ g_mime_stream_perlio_finalize (GObject *object)
 {
 	GMimeStreamPerlIO *stream = (GMimeStreamPerlIO *) object;
 	
+	dTHX;
+	
 	if (stream->owner && stream->fp)
 		PerlIO_close (stream->fp);
 	
@@ -118,6 +119,8 @@ stream_read (GMimeStream *stream, char *buf, size_t len)
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	ssize_t nread;
 
+	dTHX;
+	
 	if (stream->bound_end != -1 && stream->position >= stream->bound_end)
 		return -1;
 	
@@ -141,6 +144,8 @@ stream_write (GMimeStream *stream, char *buf, size_t len)
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	ssize_t nwritten;
 
+	dTHX;
+	
 	if (stream->bound_end != -1 && stream->position >= stream->bound_end)
 		return -1;
 	
@@ -165,6 +170,8 @@ stream_flush (GMimeStream *stream)
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
 	
+	dTHX;
+	
 	return PerlIO_flush (fstream->fp);
 }
 
@@ -175,6 +182,8 @@ stream_close (GMimeStream *stream)
 	int ret;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
+	
+	dTHX;
 	
 	ret = PerlIO_close (fstream->fp);
 	if (ret != -1)
@@ -190,6 +199,8 @@ stream_eos (GMimeStream *stream)
 
 	g_return_val_if_fail (fstream->fp != NULL, TRUE);
 	
+	dTHX;
+	
 	if (stream->bound_end == -1)
 		return PerlIO_eof (fstream->fp) ? TRUE : FALSE;
 	else
@@ -203,6 +214,8 @@ stream_reset (GMimeStream *stream)
 	int ret;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
+	
+	dTHX;
 	
 	if (stream->position == stream->bound_start)
 		return 0;
@@ -222,6 +235,8 @@ stream_seek (GMimeStream *stream, off_t offset, GMimeSeekWhence whence)
 	int ret;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
+	
+	dTHX;
 	
 	switch (whence) {
 	case GMIME_STREAM_SEEK_SET:
@@ -270,6 +285,8 @@ stream_length (GMimeStream *stream)
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	off_t bound_end;
 	
+	dTHX;
+	
 	if (stream->bound_start != -1 && stream->bound_end != -1)
 		return stream->bound_end - stream->bound_start;
 	
@@ -310,6 +327,8 @@ GMimeStream *
 g_mime_stream_perlio_new (PerlIO *fp)
 {
 	GMimeStreamPerlIO *fstream;
+	
+	dTHX;
 	
 	fstream = g_object_new (GMIME_TYPE_STREAM_PERLIO, NULL, NULL);
 	fstream->owner = TRUE;

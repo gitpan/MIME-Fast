@@ -44,13 +44,10 @@ g_mime_message_partial_reconstruct_message(svmixed)
 	SV *			svmixed
     PREINIT:
 	SV *			svvalue;
-	AV *			avvalue;
 	svtype			svvaltype;
-	size_t			nparts = 0, i;
 	GMimeMessagePartial	**msg_list, *partial;
 	GMimeMessage		*message;
 	GPtrArray		*parts;
-	I32			avlen;
     CODE:
 	svvalue = svmixed;
 	if (SvROK(svmixed)) {
@@ -60,10 +57,10 @@ g_mime_message_partial_reconstruct_message(svmixed)
 	
 	parts = g_ptr_array_new ();
 	if (svvaltype == SVt_PVAV) {
-	  AV *	avvalue;
+	  AV *		avvalue;
 	  I32		i, avlen;
-	  SV *	svtmp;
-	  IV tmp;
+	  SV *		svtmp;
+	  IV 		tmp;
 
 	  /* set header */
 	  avvalue = (AV *)svvalue;
@@ -108,7 +105,6 @@ g_mime_message_partial_split_message(message, max_size)
 	int			i = 0;
         AV * 			retav;
 	GMimeMessage		**msg_list = NULL;
-	GMimeMessage		*msg_item = NULL;
 	SV *			svmsg;
     CODE:
 	retav = newAV();

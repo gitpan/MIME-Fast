@@ -1,3 +1,11 @@
+Mon, Jun 23 2003 (1.0.1)
+ * polishing a code - drop unused variables, etc.
+ * gmime-stream-perlio.c - fixed compilation problems with multithreaded perl
+
+Sat, Jun 21 2003
+ * fixed wrong HV interpretation in $parser->set_header_regex()
+   Add new test paragraph for that case.
+
 Mon, Jun 18 2003 (1.0.0)
  * split Fast.xs into separate classes located in Fast/ directory
  * new filter added - MIME::Fast::Filter::Enriched

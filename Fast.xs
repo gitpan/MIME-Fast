@@ -240,11 +240,9 @@ size_t
 call_filter_sizeout_func (size_t len, gpointer data)
 {
     dSP ;
-    	int	count;
+    	int	count = 0;
 	size_t	outlen = 0;
         struct _user_data_sv *svdata;
-	char *outptr;
-	SV *	svin;
 
     ENTER ;
     SAVETMPS;
@@ -279,7 +277,7 @@ size_t
 call_filter_complete_func (unsigned char *in, size_t len, unsigned char *out, int *state, guint32 *save, gpointer data)
 {
     dSP ;
-    	int	count;
+    	int	count = 0;
 	size_t	outlen = 0;
         struct _user_data_sv *svdata;
 	char *outptr;
@@ -342,7 +340,7 @@ size_t
 call_filter_step_func (unsigned char *in, size_t len, unsigned char *out, int *state, guint32 *save, gpointer data)
 {
     dSP ;
-    	int	count;
+    	int	count = 0;
 	size_t	outlen = 0;
         struct _user_data_sv *svdata;
 	char *outptr;
@@ -412,16 +410,19 @@ call_sub_header_regex (GMimeParser *parser, const char *header,
     if (!user_data)
 	return;
 
-    hvarray = (HV *)user_data;
+    if (!user_data || !SvROK((SV *)user_data))
+	    return;
 
-    sv = hv_fetch(hvarray, "func", sizeof("func"), FALSE);
+    hvarray = (HV *)(SvRV((SV *)user_data));
+
+    sv = hv_fetch(hvarray, "func", 4, FALSE);
     if (sv == (SV**)NULL)
-      croak("call_sub_header_regex: Internal error...\n") ;
+      croak("call_sub_header_regex: Internal error getting func ...\n") ;
     svfunc = *sv;
 
-    sv = hv_fetch(hvarray, "user_data", sizeof("user_data"), FALSE);
+    sv = hv_fetch(hvarray, "user_data", 9, FALSE);
     if (sv == (SV**)NULL)
-      croak("call_sub_header_regex: Internal error...\n") ;
+      croak("call_sub_header_regex: Internal error getting user data...\n") ;
     svuser_data = *sv;
 
     PUSHMARK(sp);
@@ -443,9 +444,6 @@ get_object_type(svmixed)
         void *	data = NULL;
         SV*     svval;
         svtype	svvaltype;
-        SV *	content;
-        guint	len;
-        const char * content_char;
     CODE:
     	svval = svmixed;
         svvaltype = SvTYPE(svval);
