@@ -462,22 +462,22 @@ get_object_type(svmixed)
 	    XSRETURN_UNDEF;
 #if GMIME_CHECK_VERSION_UNSUPPORTED
 	} else if (GMIME_IS_MESSAGE_MDN((GMimeMessageMDN *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::MessageMDN", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::MessageMDN", 22);
 	} else if (GMIME_IS_MESSAGE_DELIVERY((GMimeMessageDelivery *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::MessageDelivery", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::MessageDelivery", 27);
 #endif
 	} else if (GMIME_IS_MESSAGE_PARTIAL((GMimeMessagePartial *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::MessagePartial", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::MessagePartial", 26);
 	} else if (GMIME_IS_PART((GMimePart *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::Part", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::Part", 16);
 	} else if (GMIME_IS_MULTIPART((GMimeMultipart *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::MultiPart", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::MultiPart", 21);
 	} else if (GMIME_IS_MESSAGE((GMimeMessage *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::Message", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::Message", 19);
 	} else if (GMIME_IS_MESSAGE_PART((GMimeMessagePart *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::MessagePart", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::MessagePart", 23);
 	} else if (GMIME_IS_OBJECT((GMimeObject *)data)) {
-	    RETVAL = newSVpv("MIME::Fast::Object", 0); 
+	    RETVAL = newSVpvn("MIME::Fast::Object", 18);
 	} else if (sv_isobject(svmixed)) {
             RETVAL = newSVpv( HvNAME( SvSTASH(SvRV(svmixed)) ), 0);
 	} else {

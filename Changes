@@ -1,3 +1,7 @@
+Thu, Oct 16 2003 (1.5 bug fix release)
+ * improvement patches made by Sergey Skvortsov - maintainer of FreeBSD port of MIME-Fast
+ * fixed a problem with part->set_content_md5() reported by Sergey Skvortsov
+
 Thu, Oct 16 2003 (1.4)
  * add link to gmime library to the README file
  * perl Makefile.PL would stop running if it fails to find gmime library

@@ -17,15 +17,7 @@ our @ISA = qw(Exporter DynaLoader);
 # Do not simply export all your public functions/methods/constants.
 #
 
-$MIME::Fast::GMIME_RECIPIENT_TYPE_TO = 'To';
-$MIME::Fast::GMIME_RECIPIENT_TYPE_CC = 'Cc';
-$MIME::Fast::GMIME_RECIPIENT_TYPE_BCC = 'Bcc';
-
 our @EXPORT = qw(
-	$GMIME_RECIPIENT_TYPE_TO
-	$GMIME_RECIPIENT_TYPE_CC
-	$GMIME_RECIPIENT_TYPE_BCC
-
 	GMIME_LENGTH_ENCODED
 	GMIME_LENGTH_CUMULATIVE
 	    
@@ -44,7 +36,7 @@ our @EXPORT = qw(
 	INTERNET_ADDRESS_NAME
 	INTERNET_ADDRESS_GROUP
 );
-our $VERSION = '1.4';
+our $VERSION = '1.5';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()

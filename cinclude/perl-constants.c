@@ -154,7 +154,7 @@ constant(char *name, int len, int arg)
         return INTERNET_ADDRESS_NAME;
       else if (strEQ(name, "INTERNET_ADDRESS_GROUP"))
         return INTERNET_ADDRESS_GROUP;
-    } 
+    }
     errno = EINVAL;
     return 0;
 not_there:
@@ -240,10 +240,19 @@ constant_string(char *name, int len, int arg)
             return GMIME_MDN_MODIFIER_MAILBOX_TERMINATED;
 #endif
           break;
+        case 'R':
+         /* gmime-message.h */
+          if (strEQ(name, "GMIME_RECIPIENT_TYPE_TO"))
+            return GMIME_RECIPIENT_TYPE_TO;
+          else if (strEQ(name, "GMIME_RECIPIENT_TYPE_CC"))
+            return GMIME_RECIPIENT_TYPE_CC;
+          else if (strEQ(name, "GMIME_RECIPIENT_TYPE_CC"))
+            return GMIME_RECIPIENT_TYPE_BCC;
+          break;
         }
       }
       break;
-    } 
+    }
     errno = EINVAL;
     return 0;
 not_there:

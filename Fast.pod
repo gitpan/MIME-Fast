@@ -480,7 +480,7 @@ These function are used by the parser. You can write your own.
 
 =item I<new> ()
 
-=item I<new> (type = "text", subtype = "plain")
+=item I<new> (subtype = "mixed")
 
 Class method.
 Creates a new MIME::Fast::MultiPart object with a default content-type of

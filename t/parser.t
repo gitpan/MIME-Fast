@@ -1,6 +1,6 @@
 
 use strict;
-use Test::More tests => 28;
+use Test::More tests => 30;
 
 BEGIN { use_ok( 'MIME::Fast' ); }
 
@@ -64,6 +64,14 @@ isnt($msg->get_header('X-Subject'),undef,'get arbitrary header');
 
 $part = $part->get_part(0,0);
 isa_ok($part, 'MIME::Fast::Part');
+
+$part->set_content_md5("dummy");
+my $md5sum = $part->get_content_md5();
+cmp_ok($md5sum, 'eq', 'dummy', 'Setting Content-MD5 to dummy variable');
+
+$part->set_content_md5();
+my $md5sum = $part->get_content_md5();
+cmp_ok($md5sum, 'eq', 'zmJi1SLBO1X0WArn5p8Keg==', 'Calculate Content-MD5');
 
 is(MIME::Fast::Part::encoding_to_string($part->get_encoding), 'quoted-printable');
 

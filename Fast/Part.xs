@@ -68,6 +68,21 @@ interface_p_get(mime_part)
 	get_filename
 
  #
+ # set_content_md5
+ #
+void
+g_mime_part_set_content_md5(mime_part, value = 0)
+    CASE: items == 1
+	MIME::Fast::Part	mime_part
+    CODE:
+	g_mime_part_set_content_md5(mime_part, NULL);
+    CASE: items == 2
+	MIME::Fast::Part	mime_part
+	char *			    value
+    CODE:
+	g_mime_part_set_content_md5(mime_part, value);
+
+ #
  # content_header
  #
 void
