@@ -27,7 +27,7 @@ const static char *fields[] = {
 
 /* return number of fields removed from the header of message */
 static int
-local_header_remove(local_GMimeHeader *header, const gchar *field)
+local_header_remove(GMimeHeader *header, const char *field)
 {
   struct raw_header *h, *nexth, *prevh;
   int deleted = 0;
@@ -56,15 +56,15 @@ local_header_remove(local_GMimeHeader *header, const gchar *field)
 }
 
 static GList *
-local_message_get_header(GMimeMessage *message, const gchar *field)
+local_message_get_header(GMimeMessage *message, const char *field)
 {
-    local_GMimeHeader *header;
+    GMimeHeader *header;
     struct raw_header *h;
     GList *	gret = NULL;
 
     if (field == NULL)
 	return NULL;
-    h = message->header->headers->headers;
+    h = GMIME_OBJECT(message)->headers->headers;
     while (h) {
 	if (h->value && !g_strncasecmp(field, h->name, strlen(field))) {
 	    gret = g_list_prepend(gret, g_strdup(h->value));
@@ -89,7 +89,7 @@ internal_recipients_destroy (GList *recipients)
 		
 		recipient = recipients;
 		while (recipient) {
-			internet_address_destroy (recipient->data);
+			internet_address_unref (recipient->data);
 			recipient = recipient->next;
 		}
 		
@@ -102,7 +102,7 @@ internal_recipients_destroy (GList *recipients)
 **/
 
 static void
-message_remove_header (GMimeMessage *message, const gchar *field)
+message_remove_header (GMimeMessage *message, const char *field)
 {
         InternetAddress	*ia;
         GList		*list;
@@ -117,75 +117,76 @@ message_remove_header (GMimeMessage *message, const gchar *field)
 	
 	switch (i) {
 	case HEADER_FROM:
-	  if (message->header->from)
-	    g_free (message->header->from);
-	  message->header->from = NULL;
+	  if (message->from)
+	    g_free (message->from);
+	  message->from = NULL;
 	  break;
 	case HEADER_REPLY_TO:
-	  if (message->header->reply_to)
-	    g_free (message->header->reply_to);
-	  message->header->reply_to = NULL;
+	  if (message->reply_to)
+	    g_free (message->reply_to);
+	  message->reply_to = NULL;
 	  break;
 	case HEADER_TO: {
 	  GList *recipients;
-	  gchar *type = GMIME_RECIPIENT_TYPE_TO;
+	  char *type = GMIME_RECIPIENT_TYPE_TO;
 
-	  recipients = g_hash_table_lookup (message->header->recipients, type);
-          g_hash_table_remove (message->header->recipients, type);
+	  recipients = g_hash_table_lookup (message->recipients, type);
+          g_hash_table_remove (message->recipients, type);
 	  internal_recipients_destroy(recipients);
 	  break;
 	}
 	case HEADER_CC: {
 	  GList *recipients;
-	  gchar *type = GMIME_RECIPIENT_TYPE_CC;
+	  char *type = GMIME_RECIPIENT_TYPE_CC;
 	  
-	  recipients = g_hash_table_lookup (message->header->recipients, type);
-          g_hash_table_remove (message->header->recipients, type);
+	  recipients = g_hash_table_lookup (message->recipients, type);
+          g_hash_table_remove (message->recipients, type);
 	  internal_recipients_destroy(recipients);
 	  break;
 	}
 	case HEADER_BCC: {
 	  GList *recipients;
-	  gchar *type = GMIME_RECIPIENT_TYPE_BCC;
+	  char *type = GMIME_RECIPIENT_TYPE_BCC;
 	  
-	  recipients = g_hash_table_lookup (message->header->recipients, type);
-          g_hash_table_remove (message->header->recipients, type);
+	  recipients = g_hash_table_lookup (message->recipients, type);
+          g_hash_table_remove (message->recipients, type);
 	  internal_recipients_destroy(recipients);
 	  break;
 	}
 	case HEADER_SUBJECT:
-	  if (message->header->subject)
-	    g_free(message->header->subject);
-	  message->header->subject = NULL;
+	  if (message->subject)
+	    g_free(message->subject);
+	  message->subject = NULL;
 	  break;
 	case HEADER_DATE:
 	  g_mime_message_set_header(message, field, NULL);
 	  break;
 	case HEADER_MESSAGE_ID:
-	  if (message->header->message_id)
-	    g_free (message->header->message_id);
-	  message->header->message_id = NULL;
+	  if (message->message_id)
+	    g_free (message->message_id);
+	  message->message_id = NULL;
 	  break;
 	//default: /* HEADER_UNKNOWN */
-	  //g_mime_header_remove(message->header->headers, field);
+	  //g_mime_header_remove(message->headers, field);
 	  //g_mime_message_set_header(message, field, NULL);
 	}
 
 	/* remove header */
-	local_header_remove(message->header->headers, field);
+	local_header_remove(GMIME_OBJECT(message)->headers, field);
 }
 
 /* different declarations for different types of set and get functions */
-typedef const gchar *(*GetFunc) (GMimeMessage *message);
-typedef GList       *(*GetListFunc) (GMimeMessage *message, const gchar *type );
-typedef void   (*SetFunc) (GMimeMessage *message, const gchar *value);
-typedef void   (*SetListFunc) (GMimeMessage *message, gchar *field, const gchar *value);
+typedef const char *(*GetFunc) (GMimeMessage *message);
+typedef InternetAddressList *(*GetRcptFunc) (GMimeMessage *message, const char *type );
+typedef GList *(*GetListFunc) (GMimeMessage *message, const char *type );
+typedef void   (*SetFunc) (GMimeMessage *message, const char *value);
+typedef void   (*SetListFunc) (GMimeMessage *message, const char *field, const char *value);
 
 /** different types of functions
 *
 * FUNC_CHARPTR
 *  - function with no arguments
-*  - get returns gchar*
+*  - get returns char*
 *
 * FUNC_IA (from Internet Address)
 *  - function with additional "field" argument from the fieldfunc table,
@@ -207,29 +208,30 @@ enum {
 * functions.
 **/
 static struct {
-  gchar *	name;
+  char *	name;
   GetFunc	func;
-  GetListFunc	rcptfunc;
+  GetRcptFunc	rcptfunc;
+  GetListFunc	getlistfunc;
   SetFunc	setfunc;
   SetListFunc	setlfunc;
   gint		functype;
 } fieldfunc[] = {
-  { "From",	g_mime_message_get_sender,	NULL,				g_mime_message_set_sender,	NULL, FUNC_CHARPTR },
-  { "Reply-To",	g_mime_message_get_reply_to,	NULL,				g_mime_message_set_reply_to,	NULL, FUNC_CHARPTR },
-  { "To",	NULL,				g_mime_message_get_recipients,	NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
-  { "Cc",	NULL,				g_mime_message_get_recipients,	NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
-  { "Bcc",	NULL,				g_mime_message_get_recipients,	NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
-  { "Subject",	g_mime_message_get_subject,	NULL,				g_mime_message_set_subject,	NULL, FUNC_CHARPTR },
-  { "Date",	g_mime_message_get_date_string, NULL,				g_mime_message_set_date_from_string,	NULL, FUNC_CHARFREEPTR },
-  { "Message-Id",g_mime_message_get_message_id,	NULL,				g_mime_message_set_message_id,	NULL, FUNC_CHARPTR },
-  { NULL,	NULL,			local_message_get_header,	NULL, g_mime_message_add_header, FUNC_LIST }
+  { "From",	g_mime_message_get_sender,	NULL, NULL,				g_mime_message_set_sender,	NULL, FUNC_CHARPTR },
+  { "Reply-To",	g_mime_message_get_reply_to,	NULL, NULL,				g_mime_message_set_reply_to,	NULL, FUNC_CHARPTR },
+  { "To",	NULL,				g_mime_message_get_recipients,	NULL, NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
+  { "Cc",	NULL,				g_mime_message_get_recipients,	NULL, NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
+  { "Bcc",	NULL,				g_mime_message_get_recipients,	NULL, NULL, g_mime_message_add_recipients_from_string, FUNC_IA },
+  { "Subject",	g_mime_message_get_subject,	NULL, NULL,				g_mime_message_set_subject,	NULL, FUNC_CHARPTR },
+  { "Date",	g_mime_message_get_date_string, NULL, NULL,				g_mime_message_set_date_from_string,	NULL, FUNC_CHARFREEPTR },
+  { "Message-Id",g_mime_message_get_message_id,	NULL, NULL,				g_mime_message_set_message_id,	NULL, FUNC_CHARPTR },
+  { NULL,	NULL,		NULL,	local_message_get_header,	NULL, g_mime_message_add_header, FUNC_LIST }
 };
 
 /**
 * message_set_header: set header of any type excluding special (Content- and MIME-Version:)
 **/
 static void
-message_set_header(GMimeMessage *message, const gchar *field, const gchar *value) {
+message_set_header(GMimeMessage *message, const char *field, const char *value) {
   gint		i;
 
   if (gmime_debug)
@@ -268,9 +270,9 @@ message_set_header(GMimeMessage *message, const gchar *field, const gchar *value
 **/
 static
 GList *
-message_get_header(GMimeMessage *message, const gchar *field) {
+message_get_header(GMimeMessage *message, const char *field) {
   gint		i;
-  gchar *	ret = NULL;
+  char *	ret = NULL;
   GList *	gret = NULL;
 
   for (i=0; i<=HEADER_UNKNOWN; ++i) {
@@ -280,30 +282,35 @@ message_get_header(GMimeMessage *message, const gchar *field) {
 	      field, fieldfunc[i].functype);
       switch (fieldfunc[i].functype) {
 	case FUNC_CHARFREEPTR:
-	  ret = (gchar *)(*(fieldfunc[i].func))(message);
+	  ret = (char *)(*(fieldfunc[i].func))(message);
 	  break;
 	case FUNC_CHARPTR:
-	  ret = (gchar *)(*(fieldfunc[i].func))(message);
+	  ret = (char *)(*(fieldfunc[i].func))(message);
 	  break;
 	case FUNC_IA: {
 	    GList *item, *gretcopy;
+	    InternetAddressList *ia_list = NULL, *ia;
 	    
-            gret = (*(fieldfunc[i].rcptfunc))(message, field);
-	    item = g_list_copy(gret);
-	    gret = item;
-	    while (item && item->data) {
-	      gchar *ia_string;
+	    warn("a m=0x%x f=%s\n", message, field);
+            ia_list = (*(fieldfunc[i].rcptfunc))(message, field);
+	    warn("a 0x%x\n", ia_list);
+	    gret = g_list_alloc();
+	    warn("b 0x%x\n", gret);
+	    ia = ia_list;
+	    // gret = item;
+	    warn("cbefore 0x%x\n", gret);
+	    while (ia && ia->address) {
+	      char *ia_string;
 
-	      ia_string = internet_address_to_string((InternetAddress *)item->data, FALSE);
-	      /* would not free item->data since g_list_copy does not copies
-	         item->data pointer contents */
-	      item->data = ia_string;
-	      item = item->next;
-	    }  
+	      ia_string = internet_address_to_string((InternetAddress *)ia->address, FALSE);
+	      gret = g_list_append(gret, ia_string);
+	      ia = ia->next;
+	    }
+	    warn("cout 0x%x\n", gret);
 	  }
 	  break;
 	case FUNC_LIST:
-          gret = (*(fieldfunc[i].rcptfunc))(message, field);
+          gret = (*(fieldfunc[i].getlistfunc))(message, field);
 	  break;
         default:
 	  break;
@@ -313,7 +320,7 @@ message_get_header(GMimeMessage *message, const gchar *field) {
   }
   if (gmime_debug)
     warn("message_get_header(%s) = 0x%x/%s ret=%s",
-	    field, gret, gret ? (gchar *)(gret->data) : "", ret);
+	    field, gret, gret ? (char *)(gret->data) : "", ret);
   if (gret == NULL && ret != NULL)
     gret = g_list_prepend(gret, g_strdup(ret));
   if (fieldfunc[i].functype == FUNC_CHARFREEPTR && ret)

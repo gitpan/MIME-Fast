@@ -16,8 +16,19 @@
 #include <fcntl.h>
 #include <glib.h>
 #include <gmime/gmime.h>
+#include "gmime-version.h"
 
-gboolean gmime_debug = 0;
+#define XSINTERFACE_FUNC_MIMEFAST_MESSAGE_SET(cv,f)      \
+	CvXSUBANY(cv).any_dptr = (void (*) (pTHX_ void*))(CAT2( g_mime_message_,f ))
+#define XSINTERFACE_FUNC_MIMEFAST_PART_SET(cv,f)      \
+	CvXSUBANY(cv).any_dptr = (void (*) (pTHX_ void*))(CAT2( g_mime_part_,f ))
+#define XSINTERFACE_FUNC_MIMEFAST_MULTIPART_SET(cv,f)      \
+	CvXSUBANY(cv).any_dptr = (void (*) (pTHX_ void*))(CAT2( g_mime_multipart_,f ))
+#define XSINTERFACE_FUNC_MIMEFAST_IA_SET(cv,f)      \
+	CvXSUBANY(cv).any_dptr = (void (*) (pTHX_ void*))(CAT2( internet_address_,f ))
+	
+/* debug output from MIME::Fast module */
+static gboolean gmime_debug = 0;
 
 struct raw_header {
     struct raw_header *next;
@@ -27,6 +38,7 @@ struct raw_header {
 
 typedef struct _GMimeHeader {
         GHashTable *hash;
+	GHashTable *writers;
         struct raw_header *headers;
 } local_GMimeHeader;	
 
@@ -41,11 +53,11 @@ not_here(char *s)
 #define GMIME_LENGTH_CUMULATIVE 2
 
 void
-warn_type(SV *svmixed, gchar *text)
+warn_type(SV *svmixed, char *text)
 {
   SV		*svval;
   svtype	svvaltype;
-  gchar		*svtext;
+  char		*svtext;
   STRLEN	vallen;
 
   svval = svmixed;
@@ -97,6 +109,7 @@ warn_type(SV *svmixed, gchar *text)
   
 }
 
+
 static int
 constant(char *name, int len, int arg)
 {
@@ -105,13 +118,109 @@ constant(char *name, int len, int arg)
     case 'G':
       if (strnEQ(name, "GMIME_", 6)) {
         switch (*(name+6)) {
+        case 'B':
+	  /* gmime-filter-best.h */
+          if (strEQ(name, "GMIME_BEST_ENCODING_7BIT"))
+            return GMIME_BEST_ENCODING_7BIT;
+          else if (strEQ(name, "GMIME_BEST_ENCODING_8BIT"))
+            return GMIME_BEST_ENCODING_8BIT;
+          else if (strEQ(name, "GMIME_BEST_ENCODING_BINARY"))
+            return GMIME_BEST_ENCODING_BINARY;
+	  break;
+        case 'C':
+	  /* gmime-cipher-context.h */
+          if (strEQ(name, "GMIME_CIPHER_HASH_DEFAULT"))
+            return GMIME_CIPHER_HASH_DEFAULT;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_MD2"))
+            return GMIME_CIPHER_HASH_MD2;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_MD5"))
+            return GMIME_CIPHER_HASH_MD5;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_SHA1"))
+            return GMIME_CIPHER_HASH_SHA1;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_RIPEMD160"))
+            return GMIME_CIPHER_HASH_RIPEMD160;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_TIGER192"))
+            return GMIME_CIPHER_HASH_TIGER192;
+          else if (strEQ(name, "GMIME_CIPHER_HASH_HAVAL5160"))
+            return GMIME_CIPHER_HASH_HAVAL5160;
+	  break;
+        case 'E':
+	  /* gmime-error.h */
+          if (strEQ(name, "GMIME_ERROR_GENERAL"))
+            return GMIME_ERROR_GENERAL;
+          else if (strEQ(name, "GMIME_ERROR_NOT_SUPPORTED"))
+            return GMIME_ERROR_NOT_SUPPORTED;
+          else if (strEQ(name, "GMIME_ERROR_PARSE_ERROR"))
+            return GMIME_ERROR_PARSE_ERROR;
+          else if (strEQ(name, "GMIME_ERROR_PROTOCOL_ERROR"))
+            return GMIME_ERROR_PROTOCOL_ERROR;
+          else if (strEQ(name, "GMIME_ERROR_BAD_PASSWORD"))
+            return GMIME_ERROR_BAD_PASSWORD;
+          else if (strEQ(name, "GMIME_ERROR_NO_VALID_RECIPIENTS"))
+            return GMIME_ERROR_NO_VALID_RECIPIENTS;
+	  break;
+        case 'F':
+	  /* gmime-filter-basic.h */
+          if (strEQ(name, "GMIME_FILTER_BASIC_BASE64_ENC"))
+            return GMIME_FILTER_BASIC_BASE64_ENC;
+          else if (strEQ(name, "GMIME_FILTER_BASIC_BASE64_DEC"))
+            return GMIME_FILTER_BASIC_BASE64_DEC;
+          else if (strEQ(name, "GMIME_FILTER_BASIC_QP_ENC"))
+            return GMIME_FILTER_BASIC_QP_ENC;
+          else if (strEQ(name, "GMIME_FILTER_BASIC_QP_DEC"))
+            return GMIME_FILTER_BASIC_QP_DEC;
+          else if (strEQ(name, "GMIME_FILTER_BASIC_UU_ENC"))
+            return GMIME_FILTER_BASIC_UU_ENC;
+          else if (strEQ(name, "GMIME_FILTER_BASIC_UU_DEC"))
+            return GMIME_FILTER_BASIC_UU_DEC;
+	  /* gmime-filter-best.h */
+          else if (strEQ(name, "GMIME_FILTER_BEST_CHARSET"))
+            return GMIME_FILTER_BEST_CHARSET;
+          else if (strEQ(name, "GMIME_FILTER_BEST_ENCODING"))
+            return GMIME_FILTER_BEST_ENCODING;
+	  /* gmime-filter-crlf.h */
+          else if (strEQ(name, "GMIME_FILTER_CRLF_ENCODE"))
+            return GMIME_FILTER_CRLF_ENCODE;
+          else if (strEQ(name, "GMIME_FILTER_CRLF_DECODE"))
+            return GMIME_FILTER_CRLF_DECODE;
+          else if (strEQ(name, "GMIME_FILTER_CRLF_MODE_CRLF_DOTS"))
+            return GMIME_FILTER_CRLF_MODE_CRLF_DOTS;
+          else if (strEQ(name, "GMIME_FILTER_CRLF_MODE_CRLF_ONLY"))
+            return GMIME_FILTER_CRLF_MODE_CRLF_ONLY;
+	  /* gmime-filter-from.h */
+          else if (strEQ(name, "GMIME_FILTER_FROM_MODE_DEFAULT"))
+            return GMIME_FILTER_FROM_MODE_DEFAULT;
+          else if (strEQ(name, "GMIME_FILTER_FROM_MODE_ESCAPE"))
+            return GMIME_FILTER_FROM_MODE_ESCAPE;
+          else if (strEQ(name, "GMIME_FILTER_FROM_MODE_ARMOR"))
+            return GMIME_FILTER_FROM_MODE_ARMOR;
+	  /* gmime-filter-yenc.h */
+          else if (strEQ(name, "GMIME_FILTER_YENC_DIRECTION_ENCODE"))
+            return GMIME_FILTER_YENC_DIRECTION_ENCODE;
+          else if (strEQ(name, "GMIME_FILTER_YENC_DIRECTION_DECODE"))
+            return GMIME_FILTER_YENC_DIRECTION_DECODE;
+	  break;
         case 'L':
+	  /* local constants */
           if (strEQ(name, "GMIME_LENGTH_ENCODED"))
             return GMIME_LENGTH_ENCODED;
           else if (strEQ(name, "GMIME_LENGTH_CUMULATIVE"))
             return GMIME_LENGTH_CUMULATIVE;
           break;
+        case 'M':
+	  /* gmime-multipart-signed.h */
+          if (strEQ(name, "GMIME_MULTIPART_SIGNED_CONTENT"))
+            return GMIME_MULTIPART_SIGNED_CONTENT;
+          else if (strEQ(name, "GMIME_MULTIPART_SIGNED_SIGNATURE"))
+            return GMIME_MULTIPART_SIGNED_SIGNATURE;
+	  /* gmime-multipart-encrypted.h */
+          else if (strEQ(name, "GMIME_MULTIPART_ENCRYPTED_VERSION"))
+            return GMIME_MULTIPART_ENCRYPTED_VERSION;
+          else if (strEQ(name, "GMIME_MULTIPART_ENCRYPTED_CONTENT"))
+            return GMIME_MULTIPART_ENCRYPTED_CONTENT;
+	  break;
         case 'P':
+	  /* gmime-utils.h */
           if (strEQ(name, "GMIME_PART_ENCODING_DEFAULT"))
             return GMIME_PART_ENCODING_DEFAULT;
           else if (strEQ(name, "GMIME_PART_ENCODING_7BIT"))
@@ -122,13 +231,31 @@ constant(char *name, int len, int arg)
             return GMIME_PART_ENCODING_BASE64;
           else if (strEQ(name, "GMIME_PART_ENCODING_QUOTEDPRINTABLE"))
             return GMIME_PART_ENCODING_QUOTEDPRINTABLE;
+          else if (strEQ(name, "GMIME_PART_ENCODING_UUENCODE"))
+            return GMIME_PART_ENCODING_UUENCODE;
           else if (strEQ(name, "GMIME_PART_NUM_ENCODINGS"))
             return GMIME_PART_NUM_ENCODINGS;
+          break;
+        case 'S':
+	  /* gmime-stream*.h */
+          if (strEQ(name, "GMIME_STREAM_SEEK_SET"))
+            return GMIME_STREAM_SEEK_SET;
+          else if (strEQ(name, "GMIME_STREAM_SEEK_CUR"))
+	    return GMIME_STREAM_SEEK_CUR;
+          else if (strEQ(name, "GMIME_STREAM_SEEK_END"))
+	    return GMIME_STREAM_SEEK_END;
+          else if (strEQ(name, "GMIME_STREAM_BUFFER_CACHE_READ"))
+	    return GMIME_STREAM_BUFFER_CACHE_READ;
+          else if (strEQ(name, "GMIME_STREAM_BUFFER_BLOCK_READ"))
+	    return GMIME_STREAM_BUFFER_BLOCK_READ;
+          else if (strEQ(name, "GMIME_STREAM_BUFFER_BLOCK_WRITE"))
+	    return GMIME_STREAM_BUFFER_BLOCK_WRITE;
           break;
         }
       }
       break;
     case 'I':
+      /* internet-address.h */
       if (strEQ(name, "INTERNET_ADDRESS_NONE"))
         return INTERNET_ADDRESS_NONE;
       else if (strEQ(name, "INTERNET_ADDRESS_NAME"))
@@ -143,25 +270,161 @@ not_there:
     return 0;
 }
 
+
+static const char *
+constant_string(char *name, int len, int arg)
+{
+    errno = 0;
+    switch (*name) {
+    case 'G':
+      if (strnEQ(name, "GMIME_", 6)) {
+        switch (*(name+6)) {
+        case 'D':
+	  /* gmime-disposition.h */
+          if (strEQ(name, "GMIME_DISPOSITION_ATTACHMENT"))
+            return GMIME_DISPOSITION_ATTACHMENT;
+	  else if (strEQ(name, "GMIME_DISPOSITION_INLINE"))
+	    return GMIME_DISPOSITION_INLINE;
+#if GMIME_CHECK_VERSION_2_0_9
+	  /* gmime-message-delivery.h */
+          if (strEQ(name, "GMIME_DSN_ACTION_FAILED"))
+            return GMIME_DSN_ACTION_FAILED;
+          else if (strEQ(name, "GMIME_DSN_ACTION_DELAYED"))
+            return GMIME_DSN_ACTION_DELAYED;
+          else if (strEQ(name, "GMIME_DSN_ACTION_DELIVERED"))
+            return GMIME_DSN_ACTION_DELIVERED;
+          else if (strEQ(name, "GMIME_DSN_ACTION_RELAYED"))
+            return GMIME_DSN_ACTION_RELAYED;
+          else if (strEQ(name, "GMIME_DSN_ACTION_EXPANDED"))
+            return GMIME_DSN_ACTION_EXPANDED;
+#endif
+	  break;
+        case 'M':
+#if GMIME_CHECK_VERSION_2_0_9
+	  /* gmime-message-mdn-disposition.h */
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_DISPLAYED"))
+            return GMIME_MDN_DISPOSITION_DISPLAYED;
+          else
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_DISPATCHED"))
+            return GMIME_MDN_DISPOSITION_DISPATCHED;
+          else
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_PROCESSED"))
+            return GMIME_MDN_DISPOSITION_PROCESSED;
+          else
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_DELETED"))
+            return GMIME_MDN_DISPOSITION_DELETED;
+          else
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_DENIED"))
+            return GMIME_MDN_DISPOSITION_DENIED;
+          else
+          if (strEQ(name, "GMIME_MDN_DISPOSITION_FAILED"))
+            return GMIME_MDN_DISPOSITION_FAILED;
+          else
+          if (strEQ(name, "GMIME_MDN_ACTION_MANUAL"))
+            return GMIME_MDN_ACTION_MANUAL;
+          else
+          if (strEQ(name, "GMIME_MDN_ACTION_AUTOMATIC"))
+            return GMIME_MDN_ACTION_AUTOMATIC;
+          else
+          if (strEQ(name, "GMIME_MDN_SENT_MANUALLY"))
+            return GMIME_MDN_SENT_MANUALLY;
+          else
+          if (strEQ(name, "GMIME_MDN_SENT_AUTOMATICALLY"))
+            return GMIME_MDN_SENT_AUTOMATICALLY;
+          else
+          if (strEQ(name, "GMIME_MDN_MODIFIER_ERROR"))
+            return GMIME_MDN_MODIFIER_ERROR;
+          else
+          if (strEQ(name, "GMIME_MDN_MODIFIER_WARNING"))
+            return GMIME_MDN_MODIFIER_WARNING;
+          else
+          if (strEQ(name, "GMIME_MDN_MODIFIER_SUPERSEDED"))
+            return GMIME_MDN_MODIFIER_SUPERSEDED;
+          else
+          if (strEQ(name, "GMIME_MDN_MODIFIER_EXPIRED"))
+            return GMIME_MDN_MODIFIER_EXPIRED;
+          else
+          if (strEQ(name, "GMIME_MDN_MODIFIER_MAILBOX_TERMINATED"))
+            return GMIME_MDN_MODIFIER_MAILBOX_TERMINATED;
+#endif
+          break;
+        }
+      }
+      break;
+    } 
+    errno = EINVAL;
+    return 0;
+not_there:
+    errno = ENOENT;
+    return 0;
+}
+
 /* enums */
 typedef GMimePartEncodingType	MIME__Fast__PartEncodingType;
 typedef InternetAddressType	MIME__Fast__InternetAddressType;
+typedef GMimeBestEncoding	MIME__Fast__BestEncoding;
+typedef GMimeFilterFromMode	MIME__Fast__FilterFromMode;
+typedef GMimeFilterYencDirection	Mime__Fast__FilterYencDirection;
+
 
 /* C types */
+typedef GMimeObject *		MIME__Fast__Object;
 typedef GMimeParam *		MIME__Fast__Param;
 typedef GMimePart *		MIME__Fast__Part;
+typedef GMimeParser *		MIME__Fast__Parser;
+typedef GMimeMultipart *	MIME__Fast__MultiPart;
 typedef GMimeMessage *		MIME__Fast__Message;
+typedef GMimeMessagePart *	MIME__Fast__MessagePart;
+typedef GMimeMessagePartial *	MIME__Fast__MessagePartial;
+#if GMIME_CHECK_VERSION_2_0_9
+typedef GMimeMessageDelivery *	MIME__Fast__MessageDelivery;
+typedef GMimeMessageMDN *	MIME__Fast__MessageMDN;
+typedef GMimeMessageMDNDisposition *	MIME__Fast__MessageMDNDisposition;
+typedef GMimeFilterFunc *	MIME__Fast__Filter__Func;
+#endif
 typedef InternetAddress *	MIME__Fast__InternetAddress;
+typedef GMimeDisposition *	MIME__Fast__Disposition;
 typedef GMimeContentType *	MIME__Fast__ContentType;
 typedef GMimeStream *		MIME__Fast__Stream;
+typedef GMimeStreamFilter *	MIME__Fast__StreamFilter;
 typedef GMimeDataWrapper *	MIME__Fast__DataWrapper;
 typedef GMimeFilter *		MIME__Fast__Filter;
+typedef GMimeFilterBasic *	MIME__Fast__Filter__Basic;
+typedef GMimeFilterBest *	MIME__Fast__Filter__Best;
+typedef GMimeFilterCharset *	MIME__Fast__Filter__Charset;
+typedef GMimeFilterCRLF *	MIME__Fast__Filter__CRLF;
+typedef GMimeFilterFrom *	MIME__Fast__Filter__From;
+typedef GMimeFilterHTML *	MIME__Fast__Filter__HTML;
+typedef GMimeFilterMd5 *	MIME__Fast__Filter__Md5;
+typedef GMimeFilterStrip *	MIME__Fast__Filter__Strip;
+typedef GMimeFilterYenc *	MIME__Fast__Filter__Yenc;
+typedef GMimeCharset *		MIME__Fast__Charset;
 
 /*
  * Declarations for message header hash array
  */
 #include "gmime-newfunc.c"
 #include "gmime-newfuncheader.c"
+
+#if GMIME_CHECK_VERSION_2_0_8
+static void
+local_mime_stream_file_set_owner (GMimeStream *stream, gboolean owner)
+{
+	GMimeStreamFile *fstream = GMIME_STREAM_FILE (stream);
+
+	fstream->owner = owner;
+}
+
+static void
+local_mime_stream_fs_set_owner (GMimeStream *stream, gboolean owner)
+{
+	GMimeStreamFs *fstream = GMIME_STREAM_FS (stream);
+
+	fstream->owner = owner;
+}
+#define g_mime_stream_file_set_owner(s,o) local_mime_stream_file_set_owner(s,o)
+#define g_mime_stream_fs_set_owner(s,o) local_mime_stream_fs_set_owner(s,o)
+#endif
 
 static gboolean
 recipients_destroy (gpointer key, gpointer value, gpointer user_data)
@@ -173,7 +436,7 @@ recipients_destroy (gpointer key, gpointer value, gpointer user_data)
         	
         	recipient = recipients;
         	while (recipient) {
-        		internet_address_destroy (recipient->data);
+        		internet_address_unref (recipient->data);
         		recipient = recipient->next;
         	}
         	
@@ -186,13 +449,13 @@ recipients_destroy (gpointer key, gpointer value, gpointer user_data)
 
 typedef struct {
         int			keyindex;	/* key index for firstkey */
-        gchar			*fetchvalue;	/* value for each() method fetched with FETCH */
+        char			*fetchvalue;	/* value for each() method fetched with FETCH */
         MIME__Fast__Message	objptr;		/* any object pointer */
 } hash_header;
 
 typedef hash_header *	MIME__Fast__Hash__Header;
 
-//const gchar *g_mime_message_get_sender (GMimeMessage *message);
+//const char *g_mime_message_get_sender (GMimeMessage *message);
 
 /*
  * Double linked list of perl allocated pointers (for DESTROY xsubs)
@@ -201,46 +464,242 @@ static GList *plist = NULL;
 
 /*
  * Calling callback function for each mime part
- * TODO: change it from static to data pointer variable
  */
-static SV * foreach_sub = (SV*)NULL;
+struct _user_data_sv {
+    SV *  svfunc;
+    SV *  svuser_data;
+    SV *  svfunc_complete;
+    SV *  svfunc_sizeout;
+};
 
 static void
-call_sub_foreach(GMimePart *mime_part, gpointer data)
+call_sub_foreach(GMimeObject *mime_object, gpointer data)
 {
     SV * svpart;
-    SV * svdata;
     SV * rvpart;
     HV * stash;
 
-
     dSP ;
+    struct _user_data_sv *svdata;
 
+    svdata = (struct _user_data_sv *) data;
     svpart = sv_newmortal();
-    svdata = sv_mortalcopy((SV *)(data));
-    rvpart = sv_setref_pv(svpart, "MIME::Fast::Part", (MIME__Fast__Part)mime_part);
+
+    if (GMIME_IS_MESSAGE_PARTIAL(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::MessagePartial", (MIME__Fast__MessagePartial)mime_object);
+#if GMIME_CHECK_VERSION_2_0_9
+    else if (GMIME_IS_MESSAGE_MDN(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::MessageMDN", (MIME__Fast__MessageMDN)mime_object);
+    else if (GMIME_IS_MESSAGE_DELIVERY(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::MessageDelivery", (MIME__Fast__MessageDelivery)mime_object);
+#endif
+    else if (GMIME_IS_MESSAGE_PART(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::MessagePart", (MIME__Fast__MessagePart)mime_object);
+    else if (GMIME_IS_MULTIPART(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::MultiPart", (MIME__Fast__MultiPart)mime_object);
+    else if (GMIME_IS_PART(mime_object))
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::Part", (MIME__Fast__Part)mime_object);
+    else
+        rvpart = sv_setref_pv(svpart, "MIME::Fast::Object", mime_object);
+        
     if (gmime_debug)
-    warn("function call_sub_foreach: setref (not in plist) MIME::Fast::Part 0x%x", mime_part);
+      warn("function call_sub_foreach: setref (not in plist) MIME::Fast object 0x%x", mime_object);
     PUSHMARK(sp);
     XPUSHs(rvpart);
-    XPUSHs(svdata);
+    XPUSHs(sv_mortalcopy(svdata->svuser_data));
     PUTBACK ;
-    if (foreach_sub)
-      perl_call_sv(foreach_sub, G_DISCARD);
+    if (svdata->svfunc)
+      perl_call_sv(svdata->svfunc, G_DISCARD);
 }
+
+/* filter sizeout func */
+size_t
+call_filter_sizeout_func (size_t len, gpointer data)
+{
+    dSP ;
+    	int	count;
+	size_t	outlen = 0;
+        struct _user_data_sv *svdata;
+	char *outptr;
+	SV *	svin;
+
+    ENTER ;
+    SAVETMPS;
+
+        svdata = (struct _user_data_sv *) data;
+
+    PUSHMARK(sp);
+	XPUSHs(sv_2mortal(newSViv(len)));
+	if (svdata->svuser_data)
+	XPUSHs(svdata->svuser_data);
+    PUTBACK ;
+    
+        if (svdata->svfunc_sizeout)
+          count = perl_call_sv(svdata->svfunc_sizeout, G_SCALAR);
+
+    SPAGAIN ;
+
+	switch (count) {
+	    case 1:
+		outlen = POPi;
+		break;
+	}
+    PUTBACK ;
+    FREETMPS ;
+    LEAVE ;
+	return outlen;
+}
+
+
+/* filter complete func */
+size_t
+call_filter_complete_func (unsigned char *in, size_t len, unsigned char *out, int *state, guint32 *save, gpointer data)
+{
+    dSP ;
+    	int	count;
+	size_t	outlen = 0;
+        struct _user_data_sv *svdata;
+	char *outptr;
+	SV *	svin;
+
+    ENTER ;
+    SAVETMPS;
+
+        svdata = (struct _user_data_sv *) data;
+
+	svin = sv_newmortal();
+	SvUPGRADE (svin, SVt_PV);
+	SvREADONLY_on (svin);
+	SvPVX (svin) = (char *)in;
+	SvCUR_set (svin, len);
+	SvLEN_set (svin, 0);
+	SvPOK_only (svin);
+	
+    PUSHMARK(sp);
+	XPUSHs(svin);
+	XPUSHs(sv_2mortal(newSViv(*state)));
+	XPUSHs(sv_2mortal(newSViv(*save)));
+	if (svdata->svuser_data)
+	XPUSHs(svdata->svuser_data);
+    PUTBACK ;
+    
+        if (svdata->svfunc_complete)
+          count = perl_call_sv(svdata->svfunc_complete, G_ARRAY);
+
+    SPAGAIN ;
+
+	switch (count) {
+	    case 3:
+		*save  = POPi;
+	    case 2:
+		*state = POPi;
+	    case 1:
+		{
+		    STRLEN n_a;
+		    outptr = POPpx;
+		    outlen = n_a;
+		    if (out && outptr && outlen > 0) {
+			memcpy (out, outptr, outlen);
+		    }
+		}
+		break;
+	}
+    PUTBACK ;
+    FREETMPS ;
+    LEAVE ;
+	g_free (svdata);
+
+	return outlen;
+}
+
+
+
+/* filter step func */
+size_t
+call_filter_step_func (unsigned char *in, size_t len, unsigned char *out, int *state, guint32 *save, gpointer data)
+{
+    dSP ;
+    	int	count;
+	size_t	outlen = 0;
+        struct _user_data_sv *svdata;
+	char *outptr;
+	SV *	svin;
+
+    ENTER ;
+    SAVETMPS;
+
+        svdata = (struct _user_data_sv *) data;
+
+	svin = sv_newmortal();
+	SvUPGRADE (svin, SVt_PV);
+	SvREADONLY_on (svin);
+	SvPVX (svin) = (char *)in;
+	SvCUR_set (svin, len);
+	SvLEN_set (svin, 0);
+	SvPOK_only (svin);
+	
+    PUSHMARK(sp);
+	XPUSHs(svin);
+	XPUSHs(sv_2mortal(newSViv(*state)));
+	XPUSHs(sv_2mortal(newSViv(*save)));
+	if (svdata->svuser_data)
+	XPUSHs(svdata->svuser_data);
+    PUTBACK ;
+    
+        if (svdata->svfunc)
+          count = perl_call_sv(svdata->svfunc, G_ARRAY);
+
+    SPAGAIN ;
+
+	switch (count) {
+	    case 3:
+		*save  = POPi;
+	    case 2:
+		*state = POPi;
+	    case 1:
+		{
+		    STRLEN n_a;
+		    outptr = POPpx;
+		    outlen = n_a;
+		    if (out && outptr && outlen > 0) {
+			memcpy (out, outptr, outlen);
+		    }
+		}
+		break;
+	}
+    PUTBACK ;
+    FREETMPS ;
+    LEAVE ;
+
+	return outlen;
+}
+
 
 /*
  * Returns content length of the given mime part and its descendants
  */
 static guint
-get_content_length(GMimePart *mime_part, int method)
+get_content_length(GMimeObject *mime_object, int method)
 {
-        guint lsize = 0;
+        guint			lsize = 0;
+	GMimePart *		mime_part;
+	GMimeMultipart *	mime_multipart;
 
-        if (mime_part) {
-        	lsize = (mime_part->content && mime_part->content->stream) ?
-        	  g_mime_stream_length(mime_part->content->stream) : 0; 
-        	if ((method & GMIME_LENGTH_ENCODED) && lsize) {
+        if (mime_object) {
+		if (GMIME_IS_MULTIPART(mime_object)) {
+		    mime_multipart = GMIME_MULTIPART(mime_object);
+        	    if ((method & GMIME_LENGTH_CUMULATIVE)) {
+        		GList *child = GMIME_MULTIPART (mime_multipart)->subparts;
+        		while (child) {
+        			lsize += get_content_length ( GMIME_OBJECT(child->data), method );
+        			child = child->next;
+        		}
+        	    }
+		} else if (GMIME_IS_PART(mime_object)) { // also MESSAGE_PARTIAL
+		    mime_part = GMIME_PART(mime_object);
+        	    lsize = (mime_part->content && mime_part->content->stream) ?
+        	      g_mime_stream_length(mime_part->content->stream) : 0; 
+        	    if ((method & GMIME_LENGTH_ENCODED) && lsize) {
         		GMimePartEncodingType	enc;
 
         		enc = g_mime_part_get_encoding(mime_part);
@@ -252,20 +711,73 @@ get_content_length(GMimePart *mime_part, int method)
         		    lsize = QP_ENCODE_LEN(lsize);
         		    break;
         		}
-        	}
-        	if ((method & GMIME_LENGTH_CUMULATIVE) && mime_part->children) {
-        		GList *child = mime_part->children;
-        		while (child) {
-        			lsize += get_content_length ( (GMimePart *) child->data, method );
-        			child = child->next;
-        		}
-        	}
+        	    }
+		} else if (GMIME_IS_MESSAGE_PART(mime_object)) {
+		    lsize += get_content_length(GMIME_OBJECT((g_mime_message_part_get_message(GMIME_MESSAGE_PART(mime_object)))), method);
+		} else if (GMIME_IS_MESSAGE(mime_object)) {
+		    if (GMIME_MESSAGE(mime_object)->mime_part != NULL)
+        	        lsize += get_content_length ( GMIME_OBJECT(GMIME_MESSAGE(mime_object)->mime_part), method );
+		}
         }
         return lsize;
 }
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast		
 
+SV *
+get_object_type(svmixed)
+        SV *		        svmixed
+    PREINIT:
+        void *	data = NULL;
+        SV*     svval;
+        svtype	svvaltype;
+        SV *	content;
+        guint	len;
+        const char * content_char;
+    CODE:
+    	svval = svmixed;
+        svvaltype = SvTYPE(svval);
+	if (!sv_isobject(svmixed))
+	  XSRETURN_UNDEF;
+        if (SvROK(svmixed)) {
+          IV tmp;
+          svval = SvRV(svmixed);
+          tmp = SvIV(svval);
+	  data = (void *)tmp;
+	} else {
+	  XSRETURN_UNDEF;
+	}
+        if (data == NULL) {
+	    XSRETURN_UNDEF;
+#if GMIME_CHECK_VERSION_2_0_9
+	} else if (GMIME_IS_MESSAGE_MDN((GMimeMessageMDN *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::MessageMDN", 0); 
+	} else if (GMIME_IS_MESSAGE_DELIVERY((GMimeMessageDelivery *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::MessageDelivery", 0); 
+#endif
+	} else if (GMIME_IS_MESSAGE_PARTIAL((GMimeMessagePartial *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::MessagePartial", 0); 
+	} else if (GMIME_IS_PART((GMimePart *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::Part", 0); 
+	} else if (GMIME_IS_MULTIPART((GMimeMultipart *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::MultiPart", 0); 
+	} else if (GMIME_IS_MESSAGE((GMimeMessage *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::Message", 0); 
+	} else if (GMIME_IS_MESSAGE_PART((GMimeMessagePart *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::MessagePart", 0); 
+	} else if (GMIME_IS_OBJECT((GMimeObject *)data)) {
+	    RETVAL = newSVpv("MIME::Fast::Object", 0); 
+	} else if (sv_isobject(svmixed)) {
+            RETVAL = newSVpv( HvNAME( SvSTASH(SvRV(svmixed)) ), 0);
+	} else {
+            XSRETURN_UNDEF;
+	}
+    OUTPUT:
+    	RETVAL
+	
+
+BOOT:
+g_mime_init(0);
 
 double
 constant(sv,arg)
@@ -280,21 +792,163 @@ constant(sv,arg)
     OUTPUT:
         RETVAL
 
+const char *
+constant_string(sv,arg)
+    PREINIT:
+        STRLEN		len;
+    INPUT:
+        SV *		sv
+        char *		s = SvPV(sv, len);
+        int		arg
+    CODE:
+        RETVAL = constant_string(s,len,arg);
+    OUTPUT:
+        RETVAL
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Object		PREFIX=g_mime_object_
+
+ # unsupported:
+ #  g_mime_object_register_type
+ #  g_mime_object_new_type
+ #  g_mime_object_ref
+ #  g_mime_object_unref
+
+ #
+ # content_type
+ #
+void
+g_mime_object_set_content_type(mime_object, content_type)
+        MIME::Fast::Object	mime_object
+        MIME::Fast::ContentType	content_type
+    CODE:
+        g_mime_object_set_content_type(mime_object, content_type);
+        plist = g_list_remove(plist, content_type);
+
+MIME::Fast::ContentType
+g_mime_object_get_content_type(mime_object)
+        MIME::Fast::Object	mime_object
+    PREINIT:
+	char *			textdata;
+	const GMimeContentType	*ct;
+    CODE:
+	ct = g_mime_object_get_content_type(mime_object);
+	textdata = g_mime_content_type_to_string(ct);
+        RETVAL = g_mime_content_type_new_from_string(textdata);
+	plist = g_list_prepend(plist, RETVAL);
+	g_free (textdata);
+    OUTPUT:
+    	RETVAL
+
+ #
+ # content_type_parameter
+ #
+void
+g_mime_object_set_content_type_parameter(mime_object, name, value)
+        MIME::Fast::Object	mime_object
+	const char *		name
+	const char *		value
+
+const char *
+g_mime_object_get_content_type_parameter(mime_object, name)
+        MIME::Fast::Object	mime_object
+	const char *		name
+
+ #
+ # content_id
+ #
+void
+g_mime_object_set_content_id(mime_object, content_id)
+        MIME::Fast::Object	mime_object
+	const char *		content_id
+
+const char *
+g_mime_object_get_content_id(mime_object)
+        MIME::Fast::Object	mime_object
+
+ #
+ # header
+ #
+void
+g_mime_object_add_header(mime_object, field, value)
+        MIME::Fast::Object	mime_object
+        const char *	field
+        const char *	value
+
+void
+g_mime_object_set_header(mime_object, field, value)
+        MIME::Fast::Object	mime_object
+        const char *	field
+        const char *	value
+
+const char *
+g_mime_object_get_header(mime_object, field)
+        MIME::Fast::Object	mime_object
+        const char *	field
+
+void
+g_mime_object_remove_header(mime_object, field)
+        MIME::Fast::Object	mime_object
+        const char *	field
+
+SV *
+g_mime_object_get_headers(mime_object)
+        MIME::Fast::Object	mime_object
+    PREINIT:
+	char *		textdata;
+    CODE:
+	textdata = g_mime_object_get_headers(mime_object);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+        RETVAL = newSVpv(textdata, 0);
+	g_free (textdata);
+    OUTPUT:
+        RETVAL
+
+ssize_t
+g_mime_object_write_to_stream(mime_object, mime_stream)
+        MIME::Fast::Object	mime_object
+	MIME::Fast::Stream		mime_stream
+    CODE:
+	RETVAL = g_mime_object_write_to_stream (mime_object, mime_stream);
+    OUTPUT:
+	RETVAL
+
+SV *
+g_mime_object_to_string(mime_object)
+        MIME::Fast::Object	mime_object
+    PREINIT:
+	char *	textdata;
+    CODE:
+	textdata = g_mime_object_to_string (mime_object);
+	if (textdata) {
+	  RETVAL = newSVpv(textdata, 0);
+	  g_free (textdata);
+	} else {
+	  XSRETURN_UNDEF;
+	}
+    OUTPUT:
+	RETVAL
+
+
+
+
+
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Param		PREFIX=g_mime_param_
 
 MIME::Fast::Param
 g_mime_param_new(Class = "MIME::Fast::Param", name = 0, value = 0)
     CASE: items == 2
         char *		Class;
-        const gchar *	name;
+        const char *	name;
     CODE:
         RETVAL = g_mime_param_new_from_string(name);
+        plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
         RETVAL
     CASE: items == 3
         char *		Class;
-        const gchar *	name;
-        const gchar *	value;
+        const char *	name;
+        const char *	value;
     CODE:
         RETVAL = g_mime_param_new(name, value);
         plist = g_list_prepend(plist, RETVAL);
@@ -305,14 +959,51 @@ void
 DESTROY(param)
         MIME::Fast::Param	param
     CODE:
+        if (gmime_debug)
+	  warn("g_mime_param_DESTROY: 0x%x", param);
         if (g_list_find(plist,param)) {
           g_mime_param_destroy (param);
           plist = g_list_remove(plist, param);
         }
 
-gchar *
-g_mime_param_to_string(param)
-        MIME::Fast::Param	param
+ # char *
+ # g_mime_param_to_string(param)
+ #       MIME::Fast::Param	param
+
+MIME::Fast::Param
+g_mime_param_append(params, name, value)
+	MIME::Fast::Param	params
+	const char *		name
+	const char *		value
+    CODE:
+    	RETVAL = g_mime_param_append(params, name, value);
+    OUTPUT:
+	RETVAL
+
+MIME::Fast::Param
+g_mime_param_append_param(params, param)
+	MIME::Fast::Param	params
+	MIME::Fast::Param	param
+    CODE:
+    	RETVAL = g_mime_param_append_param(params, param);
+    OUTPUT:
+	RETVAL
+
+void
+g_mime_param_write_to_string(params, fold, svtext)
+	MIME::Fast::Param	params
+	gboolean		fold
+	SV *			&svtext
+    PREINIT:
+	GString			*textdata;
+    CODE:
+        textdata = g_string_new ("");
+    	g_mime_param_write_to_string (params, fold, textdata);
+	sv_catpv(svtext, textdata->str);
+	g_string_free (textdata, TRUE);
+    OUTPUT:
+	svtext
+
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::ContentType		PREFIX=g_mime_content_type_
 
@@ -320,7 +1011,7 @@ MIME::Fast::ContentType
 g_mime_content_type_new(Class = "MIME::Fast::ContentType", name = 0, subname = 0)
     CASE: items == 2
         char *		Class;
-        const gchar *	name;
+        const char *	name;
     CODE:
         RETVAL = g_mime_content_type_new_from_string(name);
         plist = g_list_prepend(plist, RETVAL);
@@ -328,8 +1019,8 @@ g_mime_content_type_new(Class = "MIME::Fast::ContentType", name = 0, subname = 0
         RETVAL
     CASE: items == 3
         char *		Class;
-        const gchar *	name;
-        const gchar *	subname;
+        const char *	name;
+        const char *	subname;
     CODE:
         RETVAL = g_mime_content_type_new(name, subname);
         plist = g_list_prepend(plist, RETVAL);
@@ -338,35 +1029,47 @@ g_mime_content_type_new(Class = "MIME::Fast::ContentType", name = 0, subname = 0
 
 void
 DESTROY(mime_type)
-        MIME::Fast::ContentType	mime_type
+        MIME::Fast::ContentType		mime_type
     CODE:
+        if (gmime_debug)
+	  warn("g_mime_content_type_DESTROY: 0x%x", mime_type);
         if (g_list_find(plist,mime_type)) {
           g_mime_content_type_destroy(mime_type);
           plist = g_list_remove(plist, mime_type);
         }
 
-gchar *
+SV *
 g_mime_content_type_to_string(mime_type)
-        MIME::Fast::ContentType	mime_type
+        MIME::Fast::ContentType		mime_type
+    PREINIT:
+	char *	type;
+    CODE:
+	type = g_mime_content_type_to_string(mime_type);
+	if (!type)
+	  XSRETURN_UNDEF;
+	RETVAL = newSVpv(type, 0);
+	g_free (type);
+    OUTPUT:
+	RETVAL
 
 gboolean
 g_mime_content_type_is_type(mime_type, type, subtype)
-        MIME::Fast::ContentType	mime_type
-        const gchar *			type
-        const gchar *			subtype
+        MIME::Fast::ContentType		mime_type
+        const char *			type
+        const char *			subtype
 
 void
-g_mime_content_type_add_parameter(mime_type, attribute, value)
-        MIME::Fast::ContentType	mime_type
-        const gchar *			attribute
-        const gchar *			value
+g_mime_content_type_set_parameter(mime_type, attribute, value)
+        MIME::Fast::ContentType		mime_type
+        const char *			attribute
+        const char *			value
 
-gchar *
+const char *
 g_mime_content_type_get_parameter(mime_type, attribute)
-        MIME::Fast::ContentType	mime_type
-        const gchar *			attribute
+        MIME::Fast::ContentType		mime_type
+        const char *			attribute
 
-gchar *
+char *
 type(ctype)
         MIME::Fast::ContentType	ctype
     CODE:
@@ -374,13 +1077,389 @@ type(ctype)
     OUTPUT:
         RETVAL
         
-gchar *
+char *
 subtype(ctype)
         MIME::Fast::ContentType	ctype
     CODE:
         RETVAL = ctype->subtype;
     OUTPUT:
         RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MultiPart		PREFIX=g_mime_multipart_
+
+ #
+ ## CONSTRUCTION/DESCTRUCTION
+ #
+
+MIME::Fast::MultiPart
+g_mime_multipart_new(Class = "MIME::Fast::MultiPart", subtype = "mixed")
+        char *		Class;
+        const char *		subtype;
+    PROTOTYPE: $;$$
+    CODE:
+        RETVAL = g_mime_multipart_new_with_subtype(subtype);
+        plist = g_list_prepend(plist, RETVAL);
+        if (gmime_debug)
+          warn("function g_mime_multipart_new (also in plist): 0x%x", RETVAL);
+    OUTPUT:
+        RETVAL
+
+void
+DESTROY(mime_multipart)
+        MIME::Fast::MultiPart	mime_multipart
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_multipart_DESTROY: 0x%x %s", mime_multipart,
+          g_list_find(plist,mime_multipart) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,mime_multipart)) {
+          g_mime_object_unref(GMIME_OBJECT (mime_multipart));
+          // g_mime_part_destroy(mime_multipart);
+          plist = g_list_remove(plist, mime_multipart);
+        }
+
+const char *
+g_mime_multipart_to_string (mime_multipart)
+	MIME::Fast::MultiPart	mime_multipart
+    CODE:
+        RETVAL = g_mime_object_to_string(GMIME_OBJECT (mime_multipart));
+    OUTPUT:
+    	RETVAL
+
+void
+interface_p_set(mime_multipart, value)
+	MIME::Fast::MultiPart	mime_multipart
+	const char *	        value
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_MULTIPART_SET
+    INTERFACE:
+	set_boundary
+	set_preface
+	set_postface
+
+const char *
+interface_p_get(mime_multipart)
+	MIME::Fast::MultiPart	mime_multipart
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_MULTIPART_SET
+    INTERFACE:
+	get_boundary
+	get_preface
+	get_postface
+
+ #
+ # * content_length
+ #
+guint
+g_mime_multipart_get_content_length(mime_multipart, method = GMIME_LENGTH_CUMULATIVE)
+        MIME::Fast::MultiPart	mime_multipart
+        int			method
+    CODE:
+        RETVAL = get_content_length( GMIME_OBJECT(mime_multipart), method);
+    OUTPUT:
+    	RETVAL
+
+ #
+ # remove_part
+ # remove_part_at
+ #
+void
+g_mime_multipart_remove_part(mime_multipart, subpart)
+        MIME::Fast::MultiPart	mime_multipart
+        SV *			subpart
+    PREINIT:
+        GMimeObject		*mime_object = NULL;
+	int			index;
+    CODE:
+	if (sv_isobject(subpart) && SvROK(subpart)) {
+	  IV tmp = SvIV((SV*)SvRV(ST(0)));
+	  mime_object = INT2PTR(MIME__Fast__Object, tmp);
+          if (gmime_debug)
+            warn("g_mime_part_remove_subpart: 0x%x, child=0x%x (not add to plist)", mime_multipart, mime_object);
+          g_mime_multipart_remove_part(mime_multipart, mime_object);
+	} else if (SvIOK(subpart)) {
+	  index = SvIV(subpart);
+          if (gmime_debug)
+            warn("g_mime_part_remove_subpart_at: 0x%x, index=%d", mime_multipart, index);
+	  g_mime_multipart_remove_part_at(mime_multipart, index);
+	}
+        
+  # return mime part for the given numer(s)
+SV *
+g_mime_multipart_get_part(mime_multipart, ...)
+        MIME::Fast::MultiPart	mime_multipart
+    PREINIT:
+        int		i, count = 0;
+        IV		partnum = -1;
+	GMimeMultipart  *part;
+	GMimeObject     *mime_object;
+        GMimeMessage	*message;
+    CODE:
+	if (!GMIME_IS_MULTIPART(mime_multipart))
+	{
+          warn("Submitted argument is not of type MIME::Fast::MultiPart");
+	  XSRETURN_UNDEF;
+	}
+
+	RETVAL = &PL_sv_undef;
+	part = mime_multipart;
+
+	for (i=items - 1; part && i>0; --i) {
+          
+	  partnum = SvIV(ST(items - i));
+	  if (partnum >= g_mime_multipart_get_number(part)) {
+	    warn("MIME::Fast::MultiPart::get_part: part no. %d (index %d) is greater than no. of subparts (%d)",
+			    partnum, items - i, g_mime_multipart_get_number(part));
+	    if (part != mime_multipart)
+	      g_mime_object_unref(GMIME_OBJECT(part));
+	    XSRETURN_UNDEF;
+	  }
+	  mime_object = g_mime_multipart_get_part(part, partnum);
+
+	  if (part != mime_multipart)
+	    g_mime_object_unref(GMIME_OBJECT(part));
+
+	  if (i != 1) { // more parts necessary 
+	    
+	    if (GMIME_IS_MESSAGE_PART(mime_object))	// message/rfc822 - returns message
+	    {
+	      message = g_mime_message_part_get_message ((MIME__Fast__MessagePart)mime_object);
+	      g_mime_object_unref(GMIME_OBJECT(mime_object));
+   
+	      mime_object = GMIME_OBJECT(message->mime_part);
+	      g_mime_object_ref(mime_object);
+	      g_mime_object_unref(GMIME_OBJECT(message));
+	    }
+ 
+	    if (GMIME_IS_MULTIPART(mime_object))
+	    {
+	      part = GMIME_MULTIPART(mime_object);
+	    }
+	    else
+	    {
+	      warn("MIME::Fast::MultiPart::get_part: found part no. %d (index %d) that is not a Multipart MIME object", partnum, items - i);
+	      g_mime_object_unref(mime_object);
+	      XSRETURN_UNDEF;
+	    }
+
+	  }
+	  else		// the last part we are looking for
+	  {
+	    if (GMIME_IS_OBJECT(mime_object)) {
+	      RETVAL = newSViv(0);
+	      if (GMIME_IS_MESSAGE_PARTIAL(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::MessagePartial", (MIME__Fast__MessagePartial)mime_object);
+#if GMIME_CHECK_VERSION_2_0_9
+	      else if (GMIME_IS_MESSAGE_MDN(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::MessageMDN", (MIME__Fast__MessageMDN)mime_object);
+	      else if (GMIME_IS_MESSAGE_DELIVERY(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::MessageDelivery", (MIME__Fast__MessageDelivery)mime_object);
+#endif
+	      else if (GMIME_IS_MESSAGE_PART(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::MessagePart", (MIME__Fast__MessagePart)mime_object);
+	      else if (GMIME_IS_MULTIPART(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::MultiPart", (MIME__Fast__MultiPart)mime_object);
+	      else if (GMIME_IS_PART(mime_object))
+	        sv_setref_pv(RETVAL, "MIME::Fast::Part", (MIME__Fast__Part)mime_object);
+	      else
+	        sv_setref_pv(RETVAL, "MIME::Fast::Object", mime_object);
+              plist = g_list_prepend(plist, mime_object);
+	    }
+	    else
+	    {
+	      die("MIME::Fast::MultiPart::get_part: found unknown type of part no. %d (index %d)", partnum, items - i);
+	    }
+	    break;
+	  }
+ 
+	} // end of for
+
+    OUTPUT:
+        RETVAL
+
+ #
+ # subpart
+ #
+SV *
+g_mime_multipart_get_subpart_from_content_id(mime_multipart, content_id)
+        MIME::Fast::MultiPart	mime_multipart
+        const char *	content_id
+    PREINIT:
+        GMimeObject     *mime_object = NULL;
+    CODE:
+        mime_object = g_mime_multipart_get_subpart_from_content_id(mime_multipart, content_id);
+	RETVAL = newSViv(0);
+	if (mime_object == NULL)
+	  XSRETURN_UNDEF;
+	else if (GMIME_IS_MULTIPART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MultiPart", (GMimeMultipart *)mime_object);
+	else if (GMIME_IS_MESSAGE(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::Message", (GMimeMessage *)mime_object);
+	else if (GMIME_IS_MESSAGE_PARTIAL(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessagePartial", (GMimeMessagePartial *)mime_object);
+#if GMIME_CHECK_VERSION_2_0_9
+	else if (GMIME_IS_MESSAGE_MDN(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessageMDN", (GMimeMessageMDN *)mime_object);
+	else if (GMIME_IS_MESSAGE_DELIVERY(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessageDelivery", (GMimeMessageDelivery *)mime_object);
+#endif
+	else if (GMIME_IS_MESSAGE_PART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessagePart", (GMimeMessagePart *)mime_object);
+	else if (GMIME_IS_PART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::Part", (void*)mime_object);
+	else
+	  die("g_mime_multipart_get_subpart_from_content_id: unknown type of object: 0x%x", mime_object);
+	g_mime_object_ref( mime_object );
+        plist = g_list_prepend(plist, RETVAL);
+        if (gmime_debug)
+          warn("function g_mime_multipart_get_subpart_from_content_id (also in plist): 0x%x", RETVAL);
+    OUTPUT:
+        RETVAL
+
+ #
+ # add_part
+ # add_part_at
+ #
+void
+g_mime_multipart_add_part(mime_multipart, subpart, index = 0)
+    CASE: items == 2
+        MIME::Fast::MultiPart	mime_multipart
+        SV *			subpart
+    PREINIT:
+	GMimeObject		*mime_object;
+    CODE:
+	if (sv_isobject(subpart) && SvROK(subpart)) {
+	  IV tmp = SvIV((SV*)SvRV(ST(0)));
+	  mime_object = INT2PTR(MIME__Fast__Object, tmp);
+          g_mime_multipart_add_part(mime_multipart, mime_object);
+          plist = g_list_remove(plist, subpart);
+	}
+    CASE: items == 3
+        MIME::Fast::MultiPart	mime_multipart
+        SV *			subpart
+	int			index
+    PREINIT:
+	GMimeObject		*mime_object;
+    CODE:
+	if (sv_isobject(subpart) && SvROK(subpart)) {
+	  IV tmp = SvIV((SV*)SvRV(ST(0)));
+	  mime_object = INT2PTR(MIME__Fast__Object, tmp);
+          g_mime_multipart_add_part_at(mime_multipart, mime_object, index);
+          plist = g_list_remove(plist, subpart);
+	}
+
+ #
+ # get_number (number of parts)
+ #
+int
+g_mime_multipart_get_number(mime_multipart)
+        MIME::Fast::MultiPart		mime_multipart
+
+ #
+ # callback function
+ #
+void
+g_mime_multipart_foreach(mime_multipart, callback, svdata)
+        MIME::Fast::MultiPart		mime_multipart
+        SV *			callback
+        SV *			svdata
+    PREINIT:
+	struct _user_data_sv    *data;
+    CODE:
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svuser_data = svdata;
+	data->svfunc = callback;
+        g_mime_multipart_foreach(mime_multipart, call_sub_foreach, data);
+	g_free (data);
+
+ #
+ # children
+ # ALIAS: parts
+ #
+void
+children(mime_multipart, ...)
+        MIME::Fast::MultiPart	mime_multipart
+    ALIAS:
+        MIME::Fast::MultiPart::parts = 1
+    PREINIT:
+        GList *		child;
+        AV * 		retav;
+        IV		partnum = -1;
+        I32		gimme = GIMME_V;
+        gint		count = 0;
+    PPCODE:
+        if (items == 2) {
+          partnum = SvIV(ST(1));
+        }
+        if (GMIME_IS_MULTIPART (mime_multipart)) {
+          for (child = GMIME_MULTIPART (mime_multipart)->subparts; child && child->data; child = child->next, ++count) {
+            SV * part;
+	    if (gmime_debug)
+	    warn(" ** children 0x%x\n", child->data);
+            if (items == 1 && gimme == G_SCALAR)
+              continue;
+
+            # avoid unnecessary SV creation
+            if (items == 2 && partnum != count)
+              continue;
+
+            # push part
+            part = sv_newmortal();
+            if (GMIME_IS_MULTIPART(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::MultiPart", child->data);
+	      sv_setref_pv(part, "MIME::Fast::MultiPart", (MIME__Fast__MultiPart)(child->data));
+	    } else if (GMIME_IS_MESSAGE_PARTIAL(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::MessagePartial", child->data);
+              sv_setref_pv(part, "MIME::Fast::MessagePartial", (MIME__Fast__MessagePartial)(child->data));
+#if GMIME_CHECK_VERSION_2_0_9
+	    } else if (GMIME_IS_MESSAGE_MDN(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::MessageMDN", child->data);
+              sv_setref_pv(part, "MIME::Fast::MessageMDN", (MIME__Fast__MessageMDN)(child->data));
+	    } else if (GMIME_IS_MESSAGE_DELIVERY(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::MessageDelivery", child->data);
+              sv_setref_pv(part, "MIME::Fast::MessageDelivery", (MIME__Fast__MessageDelivery)(child->data));
+#endif
+	    } else if (GMIME_IS_PART(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::Part", child->data);
+              sv_setref_pv(part, "MIME::Fast::Part", (MIME__Fast__Part)(child->data));
+	    } else if (GMIME_IS_MESSAGE_PART(child->data))
+	    {
+	      if (gmime_debug)
+	      warn(" ** children add: %s 0x%x\n", "MIME::Fast::MessagePart", child->data);
+              sv_setref_pv(part, "MIME::Fast::MessagePart", (MIME__Fast__MessagePart)(child->data));
+	    } else if (GMIME_IS_OBJECT(child->data))
+	      die("g_mime_multipart children: unknown type of object: 0x%x '%s'",
+	        child->data, g_mime_content_type_to_string(g_mime_object_get_content_type(child->data)));
+	    else
+	      die("g_mime_multipart children: unknown reference (not GMIME object): 0x%x '%5s'",
+			       child->data, child->data);
+
+            if (gmime_debug)
+              warn("function g_mime_part subparts setref (not in plist): 0x%x", child->data);
+
+            if (items == 1) {
+              XPUSHs(part);
+            } else if (partnum == count) {
+              XPUSHs(part);
+              break;
+            }
+          }
+          if (gimme == G_SCALAR && partnum == -1)
+            XPUSHs(sv_2mortal(newSViv(count)));
+        }
+
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Part		PREFIX=g_mime_part_
 
@@ -391,8 +1470,8 @@ MODULE = MIME::Fast		PACKAGE = MIME::Fast::Part		PREFIX=g_mime_part_
 MIME::Fast::Part
 g_mime_part_new(Class = "MIME::Fast::Part", type = "text", subtype = "plain")
         char *		Class;
-        const gchar *		type;
-        const gchar *		subtype;
+        const char *		type;
+        const char *		subtype;
     PROTOTYPE: $;$$
     CODE:
         RETVAL = g_mime_part_new_with_type(type, subtype);
@@ -410,7 +1489,7 @@ DESTROY(mime_part)
           warn("g_mime_part_DESTROY: 0x%x %s", mime_part,
           g_list_find(plist,mime_part) ? "(true destroy)" : "(only attempt)");
         if (g_list_find(plist,mime_part)) {
-          g_mime_part_destroy(mime_part);
+          g_mime_object_unref(GMIME_OBJECT (mime_part));
           plist = g_list_remove(plist, mime_part);
         }
 
@@ -420,99 +1499,71 @@ DESTROY(mime_part)
 
  ## INTERFACE: keyword does not work with perl v5.6.0
  ## (unknown cv variable during C compilation)
- 
- #
- # void
- # interface_s_ss(mime_part, value)
- #	MIME::Fast::Part	mime_part
- #	gchar *		value
- #    INTERFACE:
- #	g_mime_part_set_content_description
- #	g_mime_part_set_content_id
- #
+ ## oh... it is working now in 5.8.0
+
+void
+interface_p_set(mime_part, value)
+	MIME::Fast::Part	mime_part
+	char *			    value
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_PART_SET
+    INTERFACE:
+	set_content_description
+	set_content_id
+	set_content_md5
+	set_content_location
+	set_content_disposition
+	set_filename
+
+
+const char *
+interface_p_get(mime_part)
+	MIME::Fast::Part	mime_part
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_PART_SET
+    INTERFACE:
+	get_content_description
+	get_content_id
+	get_content_md5
+	get_content_location
+	get_content_disposition
+	get_filename
 
  #
- # description
+ # content_header
  #
 void
-g_mime_part_set_content_description(mime_part, description)
-        MIME::Fast::Part	mime_part
-        const gchar *	description
-    CODE:
-        g_mime_part_set_content_description(mime_part, description);
+g_mime_part_set_content_header(mime_part, field, value)
+	MIME::Fast::Part	mime_part
+        const char *		field
+        const char *		value
 
-const gchar *
-g_mime_part_get_content_description(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_description(mime_part);
-    OUTPUT:
-    	RETVAL
-
- #
- # content_id
- #
-void
-g_mime_part_set_content_id(mime_part, content_id)
-        MIME::Fast::Part	mime_part
-        const gchar *	content_id
-
-const gchar *
-g_mime_part_get_content_id(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_id(mime_part);
-    OUTPUT:
-    	RETVAL
+const char *
+g_mime_part_get_content_header(mime_part, field)
+	MIME::Fast::Part	mime_part
+        const char *		field
 
  #
  # content_md5
  #
-void
-g_mime_part_set_content_md5(mime_part, content_md5)
-        MIME::Fast::Part	mime_part
-        const gchar *	content_md5
 
 gboolean
 g_mime_part_verify_content_md5(mime_part)
         MIME::Fast::Part	mime_part
         
-const gchar *
-g_mime_part_get_content_md5(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_md5(mime_part);
-    OUTPUT:
-    	RETVAL
-
  #
- # content_location
- #
-void
-g_mime_part_set_content_location(mime_part, content_location)
-        MIME::Fast::Part	mime_part
-        const gchar *	content_location
-
-const gchar *
-g_mime_part_get_content_location(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_location(mime_part);
-    OUTPUT:
-    	RETVAL
-
- #
- # content_length
+ # * content_length
  #
 guint
 g_mime_part_get_content_length(mime_part, method = GMIME_LENGTH_CUMULATIVE)
         MIME::Fast::Part	mime_part
         int			method
     CODE:
-        RETVAL = get_content_length(mime_part, method);
+        RETVAL = get_content_length( GMIME_OBJECT(mime_part), method);
     OUTPUT:
     	RETVAL
-
 
  #
  # content_type
@@ -525,13 +1576,7 @@ g_mime_part_set_content_type(mime_part, content_type)
         g_mime_part_set_content_type(mime_part, content_type);
         plist = g_list_remove(plist, content_type);
 
-MIME::Fast::ContentType
-g_mime_part_get_content_type(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_type(mime_part);
-    OUTPUT:
-    	RETVAL
+# looking for g_mime_part_get_content_type(mime_part)? it is in MIME::Fast::Object
 
  #
  # encoding
@@ -554,10 +1599,9 @@ g_mime_part_get_encoding(mime_part)
  #
  # encoding<->string
  #
-const gchar *
+const char *
 g_mime_part_encoding_to_string(encoding)
         MIME::Fast::PartEncodingType		encoding
-        # TODO - how call it
     CODE:
         RETVAL = g_mime_part_encoding_to_string(encoding);
     OUTPUT:
@@ -565,27 +1609,9 @@ g_mime_part_encoding_to_string(encoding)
 
 MIME::Fast::PartEncodingType
 g_mime_part_encoding_from_string(encoding)
-        const gchar *		encoding
+        const char *		encoding
     CODE:
         RETVAL = g_mime_part_encoding_from_string(encoding);
-    OUTPUT:
-    	RETVAL
-
- #
- # content_disposition
- #
-void
-g_mime_part_set_content_disposition(mime_part, disposition)
-        MIME::Fast::Part	mime_part
-        const gchar *		disposition
-    CODE:
-        g_mime_part_set_content_disposition(mime_part, disposition);
-
-gchar *
-g_mime_part_get_content_disposition(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_content_disposition(mime_part);
     OUTPUT:
     	RETVAL
 
@@ -595,55 +1621,24 @@ g_mime_part_get_content_disposition(mime_part)
 void
 g_mime_part_add_content_disposition_parameter(mime_part, name, value)
         MIME::Fast::Part	mime_part
-        const gchar *	name
-        const gchar *	value
+        const char *		name
+        const char *		value
     CODE:
         g_mime_part_add_content_disposition_parameter(mime_part, name, value);
 
-const gchar *
+const char *
 g_mime_part_get_content_disposition_parameter(mime_part, name)
         MIME::Fast::Part	mime_part
-        const gchar *	name
+        const char *		name
     CODE:
         RETVAL = g_mime_part_get_content_disposition_parameter(mime_part, name);
     OUTPUT:
     	RETVAL
 
- #
- # filename
- #
 void
-g_mime_part_set_filename(mime_part, filename)
-        MIME::Fast::Part	mime_part
-        const gchar *	filename
-    CODE:
-        g_mime_part_set_filename(mime_part, filename);
-
-const gchar *
-g_mime_part_get_filename(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_filename(mime_part);
-    OUTPUT:
-    	RETVAL
-
- #
- # boundary
- #
-void
-g_mime_part_set_boundary(mime_part, boundary)
-        MIME::Fast::Part	mime_part
-        const gchar *	boundary
-    CODE:
-        g_mime_part_set_boundary(mime_part, boundary);
-
-const gchar *
-g_mime_part_get_boundary(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_get_boundary(mime_part);
-    OUTPUT:
-    	RETVAL
+g_mime_part_set_content_disposition_object(mime_part, mime_disposition)
+        MIME::Fast::Part		mime_part
+	MIME::Fast::Disposition		mime_disposition
 
  #
  # content
@@ -682,19 +1677,18 @@ g_mime_part_set_content(mime_part, svmixed)
         svvaltype = SvTYPE(svval);
 
         if (svvaltype == SVt_PVGV) { // possible FILE * handle
-          FILE *  fp = IoIFP(sv_2io(svval));
+          FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
 
           mime_stream = g_mime_stream_file_new(fp);
-          ((GMimeStreamFile *)mime_stream)->owner = FALSE;
+	  g_mime_stream_file_set_owner (mime_stream, FALSE);
           mime_data_wrapper = g_mime_data_wrapper_new_with_stream(mime_stream, GMIME_PART_ENCODING_BASE64);
           g_mime_part_set_content_object(mime_part, mime_data_wrapper);
 
           g_mime_stream_unref(mime_stream);
         } else if (SvPOK(svval)) {
-          data = (gchar *)SvPV(svval, len);
+          data = (char *)SvPV(svval, len);
           g_mime_part_set_content(mime_part, data, len);
         } else {
-          warn_type(svval,"mime_set_content error");
           croak("mime_set_content: Unknown type: %d", (int)svvaltype);
         }
  
@@ -728,7 +1722,7 @@ g_mime_part_get_content(mime_part)
         MIME::Fast::Part	mime_part
     PREINIT:
         guint len;
-        const gchar * content_char;
+        const char * content_char;
         SV * content;
 
     CODE:
@@ -753,242 +1747,35 @@ g_mime_part_get_content(mime_part)
 
 
  #
- # add child/subpart
- #
-void
-g_mime_part_add_subpart(mime_part, subpart)
-        MIME::Fast::Part	mime_part
-        MIME::Fast::Part	subpart
-    CODE:
-        g_mime_part_add_subpart(mime_part, subpart);
-        plist = g_list_remove(plist, subpart);
-
- #
  ## UTILITY FUNCTIONS
  #
 
- #
- # write_to_stream
- #
 void
-g_mime_part_write_to_stream(mime_part, mime_stream)
+g_mime_part_foreach(mime_part, callback, svdata)
         MIME::Fast::Part	mime_part
-        MIME::Fast::Stream	mime_stream
-    CODE:
-        g_mime_part_write_to_stream(mime_part, mime_stream);
-
- #
- # (part_)to_string
- #
-gchar *
-g_mime_part_to_string(mime_part)
-        MIME::Fast::Part	mime_part
-    CODE:
-        RETVAL = g_mime_part_to_string(mime_part);
-    OUTPUT:
-        RETVAL
-
-
- #
- # callback function
- #
-void
-g_mime_part_foreach_part(mime_part, callback, svdata)
-        MIME::Fast::Part		mime_part
         SV *			callback
         SV *			svdata
     PREINIT:
-        gpointer		data;
-
+	struct _user_data_sv    *data;
     CODE:
-        data = (gpointer)svdata;
-        if (foreach_sub == (SV*)NULL)
-            foreach_sub = newSVsv(callback);
-        else
-            SvSetSV(foreach_sub, callback);
-        g_mime_part_foreach(mime_part, call_sub_foreach, data);
-        SvSetSV(foreach_sub, (SV*)NULL);
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svuser_data = svdata;
+	data->svfunc = callback;
+	call_sub_foreach( GMIME_OBJECT(mime_part), data);
+	g_free (data);
 
- #
- # subpart
- #
-MIME::Fast::Part
-g_mime_part_get_subpart_from_content_id(mime_part, content_id)
-        MIME::Fast::Part	mime_part
-        const gchar *	content_id
-
- #
- # del_child
- # ALIAS: del_subpart
- #
-void
-g_mime_part_remove_subpart(mime_part, child)
-        MIME::Fast::Part	mime_part
-        MIME::Fast::Part	child
-    ALIAS:
-        MIME::Fast::Part::remove_child = 1
-    CODE:
-        if (gmime_debug)
-        warn("g_mime_part_del_subpart: 0x%x, child=0x%x (add child to plist)", mime_part, child);
-        g_mime_part_del_subpart(mime_part, child);
-        //RETVAL = child;
-        plist = g_list_prepend(plist, child);
-        
- #
- # children
- # ALIAS: parts
- #
-void
-children(mime_part, ...)
-        MIME::Fast::Part	mime_part
-    ALIAS:
-        MIME::Fast::Part::parts = 1
-    PREINIT:
-        GList *		child;
-        AV * 		retav;
-        IV		partnum = -1;
-        I32		gimme = GIMME_V;
-        gint		count = 0;
-    PPCODE:
-        if (items == 2) {
-          partnum = SvIV(ST(1));
-        }
-        for (child = mime_part->children; child && child->data; child = child->next, ++count) {
-          SV * part;
-          if (items == 1 && gimme == G_SCALAR)
-            continue;
-
-          # avoid unnecessary SV creation
-          if (items == 2 && partnum != count)
-            continue;
-
-          # push part
-          part = sv_newmortal();
-          sv_setref_pv(part, "MIME::Fast::Part", (MIME__Fast__Part)(child->data));
-        if (gmime_debug)
-          warn("function g_mime_part_children setref (not in plist): 0x%x", child->data);
-
-          if (items == 1) {
-            XPUSHs(part);
-          } else if (partnum == count) {
-              XPUSHs(part);
-              break;
-          }
-        }
-        if (gimme == G_SCALAR && partnum == -1)
-          XPUSHs(sv_2mortal(newSViv(count)));
-          
- # return mime part for the given numer(s)
-SV *
-g_mime_part_get_subpart_by_number(sv_main_part, ...)
-        SV *		sv_main_part
-    PREINIT:
-        gint		i, count = 0;
-        IV		partnum = -1;
-        GMimePart	*part, *mime_part, *parent_part;
-        GMimeMessage	*message;
-        guint		len;
-        SV *		retsv = NULL;
-    CODE:
-        /* retrieve mime_part */
-        if (sv_derived_from(ST(0), "MIME::Fast::Part")) {
-            IV tmp = SvIV((SV*)SvRV(ST(0)));
-            mime_part = INT2PTR(MIME__Fast__Part,tmp);
-        } else if (sv_derived_from(ST(0), "MIME::Fast::Message")) {
-            IV tmp = SvIV((SV*)SvRV(ST(0)));
-            message = INT2PTR(MIME__Fast__Message,tmp);
-            mime_part = message->mime_part;
-        }
-        else
-            croak("given message/part is not of type MIME::Fast::Part nor MIME::Fast::Message");
-            
-        /**/
-        part = mime_part;
-        parent_part = part;
-        for (i=items - 1; part && i>0; --i) {
-          partnum = SvIV(ST(items - i));
-        if (gmime_debug)
-          warn("subpart_by_number: part = 0x%x (%s), items = %d i = %d partnum(%d) = %d",
-          	part, g_mime_content_type_to_string(g_mime_part_get_content_type(part)),
-        	items, i, items - i, partnum);
-          if (g_mime_content_type_is_type(g_mime_part_get_content_type(part),"message","rfc822")) {
-            if (i == 1) { /* the last part we are looking for */
-              /* construct new message from the attachment contents */
-              gchar *part_content = g_mime_part_get_content(part, &len);
-              GMimeStream *stream;
-
-              stream = g_mime_stream_mem_new_with_buffer(part_content,len);
-              message = g_mime_parser_construct_message(stream,1);
-              g_mime_stream_unref(stream);
-              if (gmime_debug)
-                warn("construct_message from subpart 0x%x from data = 0x%x len = %d", message, part_content, len);
-              plist = g_list_prepend(plist, message);
-              /* g_mime_message_destroy (message); */
-              RETVAL = sv_newmortal();
-              sv_setref_pv(RETVAL, "MIME::Fast::Message", (MIME__Fast__Message)(message));
-              retsv = RETVAL;
-              if (gmime_debug)
-              warn("function g_mime_part_subpart_by_number new MIME::Fast::Message: 0x%x", message);
-              break;
-            } else {
-              SV * tmp;
-              GMimeStream *stream;
-              gchar *part_content = g_mime_part_get_content(part, &len);
-
-              stream = g_mime_stream_mem_new_with_buffer(part_content,len);
-              part = g_mime_parser_construct_part(stream);
-              g_mime_stream_unref (stream);
-              parent_part = part; /* it is parent part now */
-              if (gmime_debug)
-              warn("function g_mime_part_subpart_by_number new consctruct part: 0x%x (not in plist) from part 0x%x", part, parent_part);
-              tmp = sv_newmortal();
-              sv_setref_pv(tmp, "MIME::Fast::Part", (MIME__Fast__Part)(part));
-              if (gmime_debug)
-              warn("Put in plist Part 0x%x / part 0x%x", tmp, part);
-              plist = g_list_prepend(plist, part);
-            }
-          } else if (g_mime_content_type_is_type(g_mime_part_get_content_type(part),"multipart","*")) {
-            parent_part = part;
-            part = g_list_nth_data(part->children, partnum);
-          } else {
-            die("Part 0x%x is not multipart only '%s'", part, g_mime_content_type_to_string(g_mime_part_get_content_type(part)));
-          }
-        }
-
-        /* check if part is NULL */
-        if (!part) {
-          ST(0) = &PL_sv_undef;
-          return;
-        }
-
-        if (part != parent_part)
-          g_mime_part_del_subpart(parent_part, part);
-          if (gmime_debug)
-          warn("subpart_by_number: part = 0x%x (%s), items = %d i = %d partnum(%d) = %d",
-          	part, g_mime_content_type_to_string(g_mime_part_get_content_type(part)),
-        	items, i, items - i, partnum);
-          if (gmime_debug)
-        warn("subpart_by_number: end");
-        if (!retsv) {
-          RETVAL = sv_newmortal();
-          sv_setref_pv(RETVAL, "MIME::Fast::Part", (MIME__Fast__Part)(part));
-          if (part != mime_part)
-            plist = g_list_prepend(plist, part);
-          if (gmime_debug)
-          warn("function g_mime_part_subpart_by_number returns part 0x%x in plist=%d", part, part != mime_part);
-        }
-    OUTPUT:
-        RETVAL
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Message	PREFIX=g_mime_message_
 
 # new(pretty_headers)
 MIME::Fast::Message
-g_mime_message__new(Class, pretty_headers = FALSE)
-        gchar *		Class
+g_mime_message_new(Class, pretty_headers = FALSE)
+        char *		Class
         gboolean	pretty_headers
     CODE:
         RETVAL = g_mime_message_new(pretty_headers);
+	if (gmime_debug)
+          warn("g_mime_message_NEW: 0x%x\n", RETVAL);
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
         RETVAL
@@ -999,56 +1786,49 @@ DESTROY(message)
         MIME::Fast::Message	message
     CODE:
         if (gmime_debug)
-          warn("g_mime_message_DESTROY: 0x%x", message);
-        g_mime_message_destroy (message);
+          warn("g_mime_message_DESTROY: 0x%x %s", message,
+            g_list_find(plist,message) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,message)) {
+          g_mime_object_unref (GMIME_OBJECT (message));
+          plist = g_list_remove(plist, message);
+	}
 
 # sender
 void
-g_mime_message_set_sender(message, sender)
+g_mime_message_test_type(message)
         MIME::Fast::Message	message
-        const gchar *	sender
+    CODE:
+	warn(" ** Testing message 0x%x\n", message);
+	warn(" ** Message is message: %s\n", GMIME_IS_MESSAGE(message) ? "true" : "false");
 
-const gchar *
-g_mime_message_get_sender(message)
-        MIME::Fast::Message	message
-        
-# reply_to
-void
-g_mime_message_set_reply_to(message, reply_to)
-        MIME::Fast::Message	message
-        const gchar *	reply_to
 
-const gchar *
-g_mime_message_get_reply_to(message)
-        MIME::Fast::Message	message
-        
 # recipient
 void
 g_mime_message_add_recipient(message, type, name, address)
         MIME::Fast::Message	message
-        gchar *		type
-        const gchar *	name
-        const gchar *	address
+        char *		type
+        const char *	name
+        const char *	address
 
 void
 g_mime_message_add_recipients_from_string(message, type, recipients)
  	MIME::Fast::Message	message
-        gchar *		type
-        const gchar *	recipients
+        char *		type
+        const char *	recipients
 
 AV *
 g_mime_message_get_recipients(message, type)
         MIME::Fast::Message	message
-        const gchar *	type
+        const char *	type
     PREINIT:
-        GList *		rcpt;
+        InternetAddressList *		rcpt;
         AV * 		retav;
     CODE:
         retav = newAV();
         rcpt = g_mime_message_get_recipients(message, type);
-        while (rcpt && rcpt->data) {
+        while (rcpt) {
           SV * address = newSViv(0);
-          sv_setref_pv(address, "MIME::Fast::InternetAddress", (MIME__Fast__InternetAddress)(rcpt->data));
+          sv_setref_pv(address, "MIME::Fast::InternetAddress", (MIME__Fast__InternetAddress)(rcpt->address));
           av_push(retav, address);
           rcpt = rcpt->next;
         }
@@ -1056,15 +1836,31 @@ g_mime_message_get_recipients(message, type)
     OUTPUT:
         RETVAL
 
-# subject
-void
-g_mime_message_set_subject(message, subject)
-        MIME::Fast::Message	message
-        const gchar *	subject
 
-const gchar *
-g_mime_message_get_subject(message)
+void
+interface_m_set(message, value)
         MIME::Fast::Message	message
+	char *			value
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_MESSAGE_SET
+    INTERFACE:
+	set_subject
+	set_message_id
+	set_reply_to
+	set_sender
+
+const char *
+interface_m_get(message)
+        MIME::Fast::Message	message
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_MESSAGE_SET
+    INTERFACE:
+	get_subject
+	get_message_id
+	get_reply_to
+	get_sender
         
  # date
 void
@@ -1076,7 +1872,7 @@ g_mime_message_set_date(message, date, gmt_offset)
 void
 g_mime_message_set_date_from_string(message, str)
         MIME::Fast::Message	message
-        const gchar *	str
+        const char *	str
 
  #
  # returns scalar string or array (date, gmt_offset)
@@ -1088,144 +1884,52 @@ g_mime_message_get_date(message)
         time_t		date;
         int		gmt_offset;
         I32		gimme = GIMME_V;
+	char *		str;
     PPCODE:
         if (gimme == G_SCALAR) {
-          gchar *str = g_mime_message_get_date_string(message);
-          XPUSHs(sv_2mortal(newSVpv(str,0)));
+          str = g_mime_message_get_date_string(message);
+	  if (str) {
+            XPUSHs(sv_2mortal(newSVpv(str,0)));
+	    g_free (str);
+	  }
         } else if (gimme == G_ARRAY) {
           g_mime_message_get_date(message, &date, &gmt_offset);
           XPUSHs(sv_2mortal(newSVnv(date)));
           XPUSHs(sv_2mortal(newSViv(gmt_offset)));
         }
 
-# message_id
-void
-g_mime_message_set_message_id(message, message_id)
-        MIME::Fast::Message	message
-        const gchar *	message_id
-
-const gchar *
-g_mime_message_get_message_id(message)
-        MIME::Fast::Message	message
-
 # the other headers
 void
 g_mime_message_set_header(message, field, value)
         MIME::Fast::Message	message
-        const gchar *	field
-        const gchar *	value
+        const char *	field
+        const char *	value
     CODE:
-        message_set_header(message, field, value);
+        g_mime_message_set_header(message, field, value);
+        // message_set_header(message, field, value);
     	
 
 void
 g_mime_message_remove_header(message, field)
         MIME::Fast::Message	message
-        const gchar *	field
+        const char *	field
     CODE:
-        message_remove_header(message, field);
+        g_mime_object_remove_header(GMIME_OBJECT (message), field);
 
-# new function - add any header
+ # add arbitrary header
 void
 g_mime_message_add_header(message, field, value)
         MIME::Fast::Message	message
-        const gchar *	field
-        const gchar *	value
+        const char *	field
+        const char *	value
 
 # CODE:
 #	message_set_header(message, field, value);
 
-void
+const char *
 g_mime_message_get_header(message, field)
         MIME::Fast::Message	message
-        const gchar *	field
-    PREINIT:
-        gint		i = 0;
-        gchar *		enc_value = NULL;
-        GList *		rcpt;
-    PPCODE:
-
-        for (i = 0; i < HEADER_UNKNOWN; ++i)
-          if (!g_strncasecmp(field, fields[i], strlen(fields[i])))
-            break;
-        
-        switch (i) {
-        case HEADER_FROM:
-          enc_value = g_mime_message_get_sender(message);
-          break;
-        case HEADER_REPLY_TO:
-          enc_value = g_mime_message_get_reply_to(message);
-          break;
-        case HEADER_TO:
-          rcpt = g_mime_message_get_recipients(message,
-        	GMIME_RECIPIENT_TYPE_TO);
-          while (rcpt && rcpt->data) {
-            InternetAddress *ia = (InternetAddress *)(rcpt->data);
-            enc_value = internet_address_to_string(ia, FALSE);
-            /* XPUSHp(enc_value, (strlen(enc_value))); */
-            XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
-            rcpt = rcpt->next;
-          }
-          enc_value = NULL;
-          break;
-        case HEADER_CC:
-          rcpt = g_mime_message_get_recipients(message,
-        	GMIME_RECIPIENT_TYPE_CC);
-          while (rcpt && rcpt->data) {
-            InternetAddress *ia = (InternetAddress *)(rcpt->data);
-            enc_value = internet_address_to_string(ia, FALSE);
-            XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
-            rcpt = rcpt->next;
-          }
-          enc_value = NULL;
-          break;
-        case HEADER_BCC:
-          rcpt = g_mime_message_get_recipients(message,
-        	GMIME_RECIPIENT_TYPE_BCC);
-          while (rcpt && rcpt->data) {
-            InternetAddress *ia = (InternetAddress *)(rcpt->data);
-            enc_value = internet_address_to_string(ia, FALSE);
-            XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
-            rcpt = rcpt->next;
-          }
-          enc_value = NULL;
-          break;
-        case HEADER_SUBJECT:
-          enc_value = g_mime_message_get_subject(message);
-          break;
-        case HEADER_DATE:
-          enc_value = g_mime_message_get_date_string(message);
-          break;
-        case HEADER_MESSAGE_ID:
-          enc_value = g_mime_message_get_message_id(message);
-          break;
-        default: /* HEADER_UNKNOWN */
-          {
-            GList *gret = message_get_header(message, field);
-
-            while (gret && gret->data) {
-              enc_value = (gchar *)(gret->data);
-              XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
-              gret = gret->next;
-            }
-          }
-          /*
-          enc_value = g_mime_message_get_header(message, field);
-          for (i = 0; i < message->header->arbitrary_headers->len; i++) {
-            const GMimeHeader *header;
-          
-            header = message->header->arbitrary_headers->pdata[i];
-            if (!g_strncasecmp(field, header->name, strlen(header->name))) { 
-              enc_value = g_mime_utils_8bit_header_encode (header->value);
-              XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
-            }
-          }
-          enc_value = NULL;
-          */
-          break;
-        }
-        if (i != HEADER_UNKNOWN && enc_value)
-          XPUSHs(sv_2mortal(newSVpv(enc_value,0)));
+        const char *	field
 
 # mime_part
 void
@@ -1233,34 +1937,25 @@ g_mime_message_set_mime_part(message, mime_part)
         MIME::Fast::Message	message
         MIME::Fast::Part	mime_part
     CODE:
-        g_mime_message_set_mime_part(message, mime_part);
+        g_mime_message_set_mime_part(message, GMIME_OBJECT (mime_part));
         plist = g_list_remove(plist, mime_part);
 
 ## UTILITY FUNCTIONS
 
- #
- # write_to_stream
- #
-void
-g_mime_message_write_to_stream(message, mime_stream)
-        MIME::Fast::Message	message
-        MIME::Fast::Stream	mime_stream
-    CODE:
-        g_mime_message_write_to_stream(message, mime_stream);
-        
-gchar *
-g_mime_message_to_string(message)
-        MIME::Fast::Message	message
-
-gchar *
+SV *
 g_mime_message_get_body(message, want_plain = 1, is_html = 0)
     CASE: items == 1
         MIME::Fast::Message	message
     PREINIT:
         gboolean	want_plain = 1;
         gboolean	is_html;
+	char *		textdata;
     CODE:
-        RETVAL = g_mime_message_get_body(message, want_plain, &is_html);
+        textdata = g_mime_message_get_body(message, want_plain, &is_html);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+        RETVAL = newSVpv(textdata, 0);
+	g_free (textdata);
     OUTPUT:
         RETVAL
     CASE: items == 2
@@ -1268,22 +1963,45 @@ g_mime_message_get_body(message, want_plain = 1, is_html = 0)
         gboolean	want_plain
     PREINIT:
         gboolean	is_html;
+	char *		textdata;
     CODE:
-        RETVAL = g_mime_message_get_body(message, want_plain, &is_html);
+        textdata = g_mime_message_get_body(message, want_plain, &is_html);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+        RETVAL = newSVpv(textdata, 0);
+	g_free (textdata);
     OUTPUT:
         RETVAL
     CASE: items == 3
         MIME::Fast::Message	message
         gboolean	want_plain
         gboolean	&is_html
+    PREINIT:
+	char *		textdata;
+    CODE:
+        textdata = g_mime_message_get_body(message, want_plain, &is_html);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+        RETVAL = newSVpv(textdata, 0);
+	g_free (textdata);
     OUTPUT:
         is_html
         RETVAL
         
 
-gchar *
+SV *
 g_mime_message_get_headers(message)
         MIME::Fast::Message	message
+    PREINIT:
+	char *		textdata;
+    CODE:
+	textdata = g_mime_message_get_headers(message);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+        RETVAL = newSVpv(textdata, 0);
+	g_free (textdata);
+    OUTPUT:
+        RETVAL
 
 # callback function
 void
@@ -1292,31 +2010,995 @@ g_mime_message_foreach_part(message, callback, svdata)
         SV *			callback
         SV *			svdata
     PREINIT:
-        gpointer		data;
+	struct _user_data_sv    *data;
 
     CODE:
-/**/
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svuser_data = svdata;
+	data->svfunc = callback;
         data = (gpointer)svdata;
-        if (foreach_sub == (SV*)NULL)
-            foreach_sub = newSVsv(callback);
-        else
-            SvSetSV(foreach_sub, callback);
         g_mime_message_foreach_part(message, call_sub_foreach, data);
-        SvSetSV(foreach_sub, (SV*)NULL);
-/**/
+	g_free (data);
 
 ## "OBJECTS" FUNCTION
 
-MIME::Fast::Part
+ # returns Part or MultiPart
+SV *
 get_mime_part(message)
         MIME::Fast::Message	message
+    PREINIT:
+    	GMimeObject *	mime_object;
     CODE:
-        RETVAL = message->mime_part;
-        if (gmime_debug)
-          warn("function message->mime_part returns (not in plist): 0x%x", RETVAL);
+        if (message->mime_part != NULL) {
+	  RETVAL = newSViv(4);
+          mime_object = GMIME_OBJECT(message->mime_part);
+          if (GMIME_IS_MULTIPART(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::MultiPart", (MIME__Fast__MultiPart)mime_object);
+	  else if (GMIME_IS_MESSAGE_PARTIAL(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::MessagePartial", (MIME__Fast__MessagePartial)mime_object);
+#if GMIME_CHECK_VERSION_2_0_9
+	  else if (GMIME_IS_MESSAGE_MDN(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::MessageMDN", (MIME__Fast__MessageMDN)mime_object);
+	  else if (GMIME_IS_MESSAGE_DELIVERY(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::MessageDelivery", (MIME__Fast__MessageDelivery)mime_object);
+#endif
+	  else if (GMIME_IS_PART(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::Part", (MIME__Fast__Part)mime_object);
+	  else if (GMIME_IS_MESSAGE_PART(mime_object))
+	    sv_setref_pv(RETVAL, "MIME::Fast::MessagePart", (MIME__Fast__MessagePart)mime_object);
+	  else
+	    die("get_mime_part: unknown type of object: 0x%x", mime_object);
+          plist = g_list_prepend(plist, RETVAL);
+	  g_mime_object_ref( mime_object );
+          if (gmime_debug)
+            warn("function message->mime_part returns (not in plist): 0x%x", RETVAL);
+	} else {
+	  RETVAL = &PL_sv_undef;
+	}
     OUTPUT:
         RETVAL
 
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MessagePart	PREFIX=g_mime_message_part_
+
+ # new(subtype)
+ # new(subtype, message)
+MIME::Fast::MessagePart
+g_mime_message_part_new(Class, subtype = "rfc822", message = NULL)
+    CASE: items <= 1
+    CODE:
+    	RETVAL = g_mime_message_part_new(NULL);
+        plist = g_list_prepend(plist, RETVAL);
+    CASE: items == 2
+        char *			Class
+        char *			subtype
+    CODE:
+    	RETVAL = g_mime_message_part_new(subtype);
+        plist = g_list_prepend(plist, RETVAL);
+    CASE: items == 3
+        char *			Class
+        char *			subtype
+	MIME::Fast::Message	message
+    CODE:
+        RETVAL = g_mime_message_part_new_with_message(subtype, message);
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+# destroy(messagepart)
+void
+DESTROY(messagepart)
+        MIME::Fast::MessagePart	messagepart
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_message_part_DESTROY: 0x%x %s", messagepart,
+          g_list_find(plist,messagepart) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,messagepart)) {
+          g_mime_object_unref (GMIME_OBJECT (messagepart));
+          plist = g_list_remove(plist, messagepart);
+	}
+
+# sender
+void
+g_mime_message_part_set_message(messagepart, message)
+        MIME::Fast::MessagePart	messagepart
+        MIME::Fast::Message	message
+
+MIME::Fast::Message
+g_mime_message_part_get_message(messagepart)
+        MIME::Fast::MessagePart	messagepart
+    CODE:
+	RETVAL = g_mime_message_part_get_message(messagepart);
+	if (gmime_debug)
+          warn("g_mime_message_part_get_message: 0x%x\n", RETVAL);
+        plist = g_list_prepend(plist, RETVAL);
+	g_mime_object_ref(GMIME_OBJECT(RETVAL));
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MessagePartial	PREFIX=g_mime_message_partial_
+
+ # new(id, number, total)
+MIME::Fast::MessagePartial
+g_mime_message_part_new(Class, id, number, total)
+        char *			Class
+        char *			id
+	int			number
+	int			total
+    CODE:
+    	RETVAL = g_mime_message_partial_new(id, number, total);
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+# destroy(partial)
+void
+DESTROY(partial)
+        MIME::Fast::MessagePartial	partial
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_message_partial_DESTROY: 0x%x %s", partial,
+          g_list_find(plist,partial) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,partial)) {
+          g_mime_object_unref (GMIME_OBJECT (partial));
+          plist = g_list_remove(plist, partial);
+	}
+
+const char *
+g_mime_message_partial_get_id(partial)
+	MIME::Fast::MessagePartial	partial
+
+int
+g_mime_message_partial_get_number(partial)
+	MIME::Fast::MessagePartial	partial
+
+int
+g_mime_message_partial_get_total(partial)
+	MIME::Fast::MessagePartial	partial
+
+MIME::Fast::Message
+g_mime_message_partial_reconstruct_message(svmixed)
+	SV *			svmixed
+    PREINIT:
+	SV *			svvalue;
+	AV *			avvalue;
+	svtype			svvaltype;
+	size_t			nparts = 0, i;
+	GMimeMessagePartial	**msg_list, *partial;
+	GMimeMessage		*message;
+	GPtrArray		*parts;
+	I32			avlen;
+    CODE:
+	svvalue = svmixed;
+	if (SvROK(svmixed)) {
+	  svvalue = SvRV(svmixed);
+	}
+	svvaltype = SvTYPE(svvalue);
+	
+	parts = g_ptr_array_new ();
+	if (svvaltype == SVt_PVAV) {
+	  AV *	avvalue;
+	  I32		i, avlen;
+	  SV *	svtmp;
+	  IV tmp;
+
+	  /* set header */
+	  avvalue = (AV *)svvalue;
+	  avlen = av_len(avvalue); // highest index in the array
+          if (avlen == -1) {
+        	croak("Usage: MIME::Fast::MessagePartial::reconstruct_message([partial,[partial]+])");
+		XSRETURN_UNDEF;
+	  }
+	  for (i=0; i<=avlen; ++i) {
+	    svtmp = (SV *)(*(av_fetch(avvalue, i, 0)));
+	    tmp = SvIV((SV*)SvRV(svtmp));
+	    if (tmp) {
+	      if (GMIME_IS_MESSAGE (tmp) && GMIME_IS_MESSAGE_PARTIAL (GMIME_MESSAGE(tmp)->mime_part)) {
+	        partial = INT2PTR(MIME__Fast__MessagePartial, GMIME_MESSAGE(tmp)->mime_part);
+	      } else if (GMIME_IS_MESSAGE_PARTIAL(tmp)) {
+	        partial = INT2PTR(MIME__Fast__MessagePartial, tmp);
+	      } else {
+		warn("MIME::Fast::Message::reconstruct_message: Unknown type of object 0x%x", tmp);
+		continue;
+	      }
+	      g_ptr_array_add (parts, partial);
+	    }
+	  }
+	}
+
+	msg_list = (GMimeMessagePartial **) parts->pdata;
+	message = g_mime_message_partial_reconstruct_message(msg_list, parts->len);
+	RETVAL = message;
+	if (gmime_debug)
+          warn("MIME::Fast::Message::reconstruct_message: 0x%x\n", RETVAL);
+	plist = g_list_prepend(plist, message);
+	g_ptr_array_free (parts, FALSE);
+    OUTPUT:
+	RETVAL
+
+AV *
+g_mime_message_partial_split_message(message, max_size)
+	MIME::Fast::Message	message
+	size_t			max_size
+    PREINIT:
+	size_t			nparts = 0;
+	int			i = 0;
+        AV * 			retav;
+	GMimeMessage		**msg_list = NULL;
+	GMimeMessage		*msg_item = NULL;
+	SV *			svmsg;
+    CODE:
+	retav = newAV();
+	msg_list = g_mime_message_partial_split_message(message, max_size, &nparts);
+	if (nparts < 1)
+	  XSRETURN_UNDEF;
+	// for nparts == 1 msg_list[0] is equal to message, then double destruction is necessary
+	for (i = 0; i < nparts; ++i) {
+		svmsg = newSViv(0);
+		sv_setref_pv(svmsg, "MIME::Fast::Message", (void *)msg_list[i]);
+		av_push(retav, svmsg);
+        	plist = g_list_prepend(plist, msg_list[i]);
+	}
+	g_free(msg_list);
+	RETVAL = retav;
+    OUTPUT:
+	RETVAL
+
+#if GMIME_CHECK_VERSION_2_0_9
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MessageDelivery	PREFIX=g_mime_message_delivery_
+
+MIME::Fast::MessageDelivery
+g_mime_message_part_new(Class)
+        char *			Class
+    CODE:
+    	RETVAL = g_mime_message_delivery_new();
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+# destroy(delivery)
+void
+DESTROY(delivery)
+        MIME::Fast::MessageDelivery	delivery
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_message_delivery_DESTROY: 0x%x %s", delivery,
+          g_list_find(plist,delivery) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,delivery)) {
+          g_mime_object_unref (GMIME_OBJECT (delivery));
+          plist = g_list_remove(plist, delivery);
+	}
+
+void
+g_mime_message_delivery_set_per_message(delivery, svmixed)
+        MIME::Fast::MessageDelivery	delivery
+	SV *				svmixed
+    PREINIT:
+	SV *			svvalue;
+	svtype			svvaltype;
+	GMimeHeader		*header;
+    CODE:
+	svvalue = svmixed;
+	if (SvROK(svmixed)) {
+	  svvalue = SvRV(svmixed);
+	}
+	svvaltype = SvTYPE(svvalue);
+	if (svvaltype == SVt_PVHV) {
+	  HV *		hvarray;
+	  I32		keylen;
+	  SV *	svtmp, *svval;
+	  IV tmp;
+	  char *key;
+
+	  hvarray = (HV *)svvalue;
+	  header = g_mime_header_new();
+	  while ((svval = hv_iternextsv(hvarray, &key, &keylen)) != NULL)
+	  {
+		  g_mime_header_add(header, key, (const char *)SvPV_nolen(svval));
+	  }
+	  g_mime_message_delivery_set_per_message(delivery, header);
+	} else {
+        	croak("Usage: MIME::Fast::MessageDelivery::add_per_rcpt(\%array_of_headers)");
+		XSRETURN_UNDEF;
+	}
+
+
+
+
+SV *
+g_mime_message_delivery_get_per_message(delivery)
+        MIME::Fast::MessageDelivery	delivery
+    PREINIT:
+	GMimeHeader *		header;
+	struct raw_header *	h;
+	HV *			rh;
+    CODE:
+	header = g_mime_message_delivery_get_per_message(delivery);
+	if (!header) {
+		XSRETURN_UNDEF;
+	}
+	rh = (HV *)sv_2mortal((SV *)newHV());
+	h = header->headers;
+	while (h && h->name) {
+		hv_store(rh, h->name, 0, newSVpv(h->value, 0), 0);
+		h = h->next;
+	}
+	g_mime_header_destroy(header);
+	RETVAL = newRV((SV *)rh);
+    OUTPUT:
+	RETVAL
+
+
+void
+g_mime_message_delivery_remove_per_message(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+
+void
+g_mime_message_delivery_add_per_recipient(delivery, svmixed = 0)
+    CASE: items == 1
+        MIME::Fast::MessageDelivery	delivery
+    CODE:
+	g_mime_message_delivery_add_per_recipient(delivery, NULL);
+    CASE: items == 2
+        MIME::Fast::MessageDelivery	delivery
+	SV *				svmixed
+    PREINIT:
+	SV *			svvalue;
+	svtype			svvaltype;
+	GMimeHeader		*header;
+    CODE:
+	svvalue = svmixed;
+	if (SvROK(svmixed)) {
+	  svvalue = SvRV(svmixed);
+	}
+	svvaltype = SvTYPE(svvalue);
+	if (svvaltype == SVt_PVHV) {
+	  HV *		hvarray;
+	  I32		keylen;
+	  SV *	svtmp, *svval;
+	  IV tmp;
+	  char *key;
+
+	  hvarray = (HV *)svvalue;
+	  header = g_mime_header_new();
+	  while ((svval = hv_iternextsv(hvarray, &key, &keylen)) != NULL)
+	  {
+		  g_mime_header_add(header, key, (const char *)SvPV_nolen(svval));
+	  }
+	  g_mime_message_delivery_add_per_recipient(delivery, header);
+	} else {
+        	croak("Usage: MIME::Fast::MessageDelivery::add_per_rcpt(\%array_of_headers)");
+		XSRETURN_UNDEF;
+	}
+
+SV *
+g_mime_message_delivery_get_per_recipient(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+    PREINIT:
+	GMimeHeader *		header;
+	struct raw_header *	h;
+	HV *			rh;
+    CODE:
+	header = g_mime_message_delivery_get_per_recipient(delivery, rcpt_index);
+	if (!header) {
+		XSRETURN_UNDEF;
+	}
+	rh = (HV *)sv_2mortal((SV *)newHV());
+	h = header->headers;
+	while (h && h->name) {
+		hv_store(rh, h->name, 0, newSVpv(h->value, 0), 0);
+		h = h->next;
+	}
+	g_mime_header_destroy(header);
+	RETVAL = newRV((SV *)rh);
+    OUTPUT:
+	RETVAL
+
+
+void
+g_mime_message_delivery_remove_per_recipient(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+
+const char *
+g_mime_message_delivery_get_original_envelope_id(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+
+void
+g_mime_message_delivery_set_original_envelope_id(delivery, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_reporting_mta(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+void
+g_mime_message_delivery_set_reporting_mta(delivery, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_dsn_gateway(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+void
+g_mime_message_delivery_set_dsn_gateway(delivery, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_received_from_mta(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+void
+g_mime_message_delivery_set_received_from_mta(delivery, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			value
+
+void
+g_mime_message_delivery_set_arrival_date_string(delivery, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			value
+
+ #
+ # returns scalar string or array (date, gmt_offset)
+ #
+void
+g_mime_message_delivery_get_arrival_date(delivery)
+        MIME::Fast::MessageDelivery	delivery
+    PREINIT:
+        time_t		date;
+        int		gmt_offset;
+        I32		gimme = GIMME_V;
+	char *		str;
+    PPCODE:
+        if (gimme == G_SCALAR) {
+          str = g_mime_message_delivery_get_arrival_date_string(delivery);
+	  if (str) {
+            XPUSHs(sv_2mortal(newSVpv(str,0)));
+	    g_free (str);
+	  }
+        } else if (gimme == G_ARRAY) {
+          g_mime_message_delivery_get_arrival_date(delivery, &date, &gmt_offset);
+          XPUSHs(sv_2mortal(newSVnv(date)));
+          XPUSHs(sv_2mortal(newSViv(gmt_offset)));
+        }
+
+void
+g_mime_message_delivery_set_arrival_date(delivery, date, gmt_offset)
+        MIME::Fast::MessageDelivery	delivery
+        time_t		date
+        int		gmt_offset
+
+const char *
+g_mime_message_delivery_get_msg_header(delivery, name)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			name
+
+void
+g_mime_message_delivery_set_msg_header(delivery, name, value)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			name
+	const char *			value
+
+void
+g_mime_message_delivery_remove_msg_header(delivery, name)
+        MIME::Fast::MessageDelivery	delivery
+	const char *			name
+
+int
+g_mime_message_delivery_get_rcpt_length(delivery)
+        MIME::Fast::MessageDelivery	delivery
+
+const char *
+g_mime_message_delivery_get_rcpt_original_recipient(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+void
+g_mime_message_delivery_set_rcpt_original_recipient(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_rcpt_final_recipient(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+void
+g_mime_message_delivery_set_rcpt_final_recipient(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_rcpt_action(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+void
+g_mime_message_delivery_set_rcpt_action(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+SV *
+g_mime_message_delivery_get_rcpt_status(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+    PREINIT:
+	char *	textdata;
+    CODE:
+	textdata = g_mime_message_delivery_get_rcpt_status(delivery, rcpt_index);
+	if (textdata) {
+	  RETVAL = newSVpv(textdata, 0);
+	  g_free (textdata);
+	} else {
+	  XSRETURN_UNDEF;
+	}
+    OUTPUT:
+	RETVAL
+
+
+void
+g_mime_message_delivery_set_rcpt_status(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_rcpt_remote_mta(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+void
+g_mime_message_delivery_set_rcpt_remote_mta(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+const char *
+g_mime_message_delivery_get_rcpt_diagnostic_code(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+
+
+void
+g_mime_message_delivery_set_rcpt_diagnostic_code(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+
+ #
+ # returns scalar string or array (date, gmt_offset)
+ #
+void
+g_mime_message_delivery_get_rcpt_last_attempt_date(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+    PREINIT:
+        time_t		date;
+        int		gmt_offset;
+        I32		gimme = GIMME_V;
+	char *		str;
+    PPCODE:
+        if (gimme == G_SCALAR) {
+          str = g_mime_message_delivery_get_rcpt_last_attempt_date_string(delivery, rcpt_index);
+	  if (str) {
+            XPUSHs(sv_2mortal(newSVpv(str,0)));
+	    g_free (str);
+	  }
+        } else if (gimme == G_ARRAY) {
+          g_mime_message_delivery_get_rcpt_last_attempt_date(delivery, rcpt_index, &date, &gmt_offset);
+          XPUSHs(sv_2mortal(newSVnv(date)));
+          XPUSHs(sv_2mortal(newSViv(gmt_offset)));
+        }
+
+
+void
+g_mime_message_delivery_set_rcpt_last_attempt_date_string(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+void
+g_mime_message_delivery_set_rcpt_last_attempt_date(delivery, rcpt_index, date, gmt_offset)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	time_t				date
+	int				gmt_offset
+
+
+void
+g_mime_message_delivery_set_rcpt_will_retry_until_string(delivery, rcpt_index, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			value
+
+
+ #
+ # returns scalar string or array (date, gmt_offset)
+ #
+void
+g_mime_message_delivery_get_rcpt_will_retry_until(delivery, rcpt_index)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+    PREINIT:
+        time_t		date;
+        int		gmt_offset;
+        I32		gimme = GIMME_V;
+	char *		str;
+    PPCODE:
+        if (gimme == G_SCALAR) {
+          str = g_mime_message_delivery_get_rcpt_will_retry_until_string(delivery, rcpt_index);
+	  if (str) {
+            XPUSHs(sv_2mortal(newSVpv(str,0)));
+	    g_free (str);
+	  }
+        } else if (gimme == G_ARRAY) {
+          g_mime_message_delivery_get_rcpt_will_retry_until(delivery, rcpt_index, &date, &gmt_offset);
+          XPUSHs(sv_2mortal(newSVnv(date)));
+          XPUSHs(sv_2mortal(newSViv(gmt_offset)));
+        }
+
+
+
+
+void
+g_mime_message_delivery_set_rcpt_will_retry_until(delivery, rcpt_index, date, gmt_offset)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	time_t				date
+	int				gmt_offset
+
+
+const char *
+g_mime_message_delivery_get_rcpt_header(delivery, rcpt_index, name)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			name
+
+
+void
+g_mime_message_delivery_set_rcpt_header(delivery, rcpt_index, name, value)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			name
+	const char *			value
+
+
+void
+g_mime_message_delivery_remove_rcpt_header(delivery, rcpt_index, name)
+        MIME::Fast::MessageDelivery	delivery
+	int				rcpt_index
+	const char *			name
+
+
+
+void
+g_mime_message_delivery_status_to_string(status)
+	const char *			status
+    PREINIT:
+	const char *	class_code;
+	const char *	class_detail;
+    PPCODE:
+	class_detail = g_mime_message_delivery_status_to_string(status, &class_code);
+	XPUSHs(sv_2mortal(newSVpv(class_code, 0)));
+	XPUSHs(sv_2mortal(newSVpv(class_detail, 0)));
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MessageMDN	PREFIX=g_mime_message_mdn_
+
+MIME::Fast::MessageMDN
+g_mime_message_part_new(Class)
+        char *			Class
+    CODE:
+    	RETVAL = g_mime_message_mdn_new();
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+# destroy(mdn)
+void
+DESTROY(mdn)
+        MIME::Fast::MessageMDN	mdn
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_message_mdn_DESTROY: 0x%x %s", mdn,
+          g_list_find(plist,mdn) ? "(true destroy)" : "(only attempt)");
+        if (g_list_find(plist,mdn)) {
+          g_mime_object_unref (GMIME_OBJECT (mdn));
+          plist = g_list_remove(plist, mdn);
+	}
+
+void
+g_mime_message_mdn_set_mdn_headers(mdn, svmixed)
+        MIME::Fast::MessageMDN	mdn
+	SV *			svmixed
+    PREINIT:
+	SV *			svvalue;
+	svtype			svvaltype;
+	GMimeHeader		*header;
+    CODE:
+	svvalue = svmixed;
+	if (SvROK(svmixed)) {
+	  svvalue = SvRV(svmixed);
+	}
+	svvaltype = SvTYPE(svvalue);
+	if (svvaltype == SVt_PVHV) {
+	  HV *		hvarray;
+	  I32		keylen;
+	  SV *	svtmp, *svval;
+	  IV tmp;
+	  char *key;
+
+	  hvarray = (HV *)svvalue;
+	  header = g_mime_header_new();
+	  while ((svval = hv_iternextsv(hvarray, &key, &keylen)) != NULL)
+	  {
+		  g_mime_header_add(header, key, (const char *)SvPV_nolen(svval));
+	  }
+	  g_mime_message_mdn_set_mdn_headers(mdn, header);
+	} else {
+        	croak("Usage: MIME::Fast::MessageDelivery::set_mdn_headers(\%array_of_headers)");
+		XSRETURN_UNDEF;
+	}
+
+
+SV *
+g_mime_message_mdn_get_mdn_headers(mdn)
+        MIME::Fast::MessageMDN	mdn
+    PREINIT:
+	GMimeHeader *		header;
+	struct raw_header *	h;
+	HV *			rh;
+    CODE:
+	header = g_mime_message_mdn_get_mdn_headers(mdn);
+	if (!header) {
+		XSRETURN_UNDEF;
+	}
+	rh = (HV *)sv_2mortal((SV *)newHV());
+	h = header->headers;
+	while (h && h->name) {
+		hv_store(rh, h->name, 0, newSVpv(h->value, 0), 0);
+		h = h->next;
+	}
+	g_mime_header_destroy(header);
+	RETVAL = newRV((SV *)rh);
+    OUTPUT:
+	RETVAL
+
+
+void
+g_mime_message_mdn_set_mdn_header(mdn, name, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			name
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_mdn_header(mdn, name)
+        MIME::Fast::MessageMDN	mdn
+	const char *			name
+
+void
+g_mime_message_mdn_remove_mdn_header(mdn, name)
+        MIME::Fast::MessageMDN	mdn
+	const char *			name
+
+
+void
+g_mime_message_mdn_set_reporting_ua(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_reporting_ua(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_mdn_gateway(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_mdn_gateway(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_original_recipient(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_original_recipient(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_final_recipient(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_final_recipient(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_original_message_id(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_original_message_id(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_disposition(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+SV *
+g_mime_message_mdn_get_disposition(mdn)
+        MIME::Fast::MessageMDN	mdn
+    PREINIT:
+	char *	textdata;
+    CODE:
+	textdata = g_mime_message_mdn_get_disposition(mdn);
+	if (textdata) {
+	  RETVAL = newSVpv(textdata, 0);
+	  g_free (textdata);
+	} else {
+	  XSRETURN_UNDEF;
+	}
+    OUTPUT:
+	RETVAL
+
+# unsupported because const MIME::Fast::MessageMDNDisposition is useless
+# g_mime_message_mdn_get_disposition_object(mdn)
+
+void
+g_mime_message_mdn_set_disposition_object(mdn, mdn_disposition)
+        MIME::Fast::MessageMDN	mdn
+	MIME::Fast::MessageMDNDisposition	mdn_disposition
+    CODE:
+	g_mime_message_mdn_set_disposition_object(mdn, mdn_disposition);
+        plist = g_list_remove(plist, mdn_disposition);
+
+
+void
+g_mime_message_mdn_set_failure(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_failure(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_error(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_error(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+void
+g_mime_message_mdn_set_warning(mdn, value)
+        MIME::Fast::MessageMDN	mdn
+	const char *			value
+
+const char *
+g_mime_message_mdn_get_warning(mdn)
+        MIME::Fast::MessageMDN	mdn
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::MessageMDNDisposition	PREFIX=g_mime_message_mdn_disposition_
+
+MIME::Fast::MessageMDNDisposition
+g_mime_message_mdn_disposition_new(Class, disposition = 0)
+    CASE: items == 1
+        char *		Class
+    CODE:
+        RETVAL = g_mime_message_mdn_disposition_new ();
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+    CASE: items == 2
+        char *		Class
+	const char *	disposition
+    CODE:
+        RETVAL = g_mime_message_mdn_disposition_new_from_string (disposition);
+        plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+# destroy(mdn_disposition)
+void
+DESTROY(mdn_disposition)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_message_mdn_disposition_DESTROY: 0x%x", mdn_disposition,
+	  g_list_find(plist,mdn_disposition) ? "(true destroy)" : "(only attempt)");
+	if (g_list_find(plist,mdn_disposition)) {
+	  g_mime_message_mdn_disposition_destroy (mdn_disposition);
+	  plist = g_list_remove(plist, mdn_disposition);
+	}
+
+void
+g_mime_message_mdn_disposition_set_action_mode(mdn_disposition, value)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+	const char *		value
+
+const char *
+g_mime_message_mdn_disposition_get_action_mode(mdn_disposition)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+
+
+void
+g_mime_message_mdn_disposition_set_sending_mode(mdn_disposition, value)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+	const char *		value
+
+const char *
+g_mime_message_mdn_disposition_get_sending_mode(mdn_disposition)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+
+
+void
+g_mime_message_mdn_disposition_set_type(mdn_disposition, value)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+	const char *		value
+
+const char *
+g_mime_message_mdn_disposition_get_type(mdn_disposition)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+
+
+void
+g_mime_message_mdn_disposition_set_modifier(mdn_disposition, value)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+	const char *		value
+
+const char *
+g_mime_message_mdn_disposition_get_modifier(mdn_disposition)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+
+
+SV *
+g_mime_message_mdn_disposition_header(mdn_disposition, fold = 0)
+        MIME::Fast::MessageMDNDisposition	mdn_disposition
+	int			fold
+    PREINIT:
+	char *	textdata;
+    CODE:
+	textdata = g_mime_message_mdn_disposition_header(mdn_disposition, fold);
+	if (textdata) {
+	  RETVAL = newSVpv(textdata, 0);
+	  g_free (textdata);
+	} else {
+	  XSRETURN_UNDEF;
+	}
+    OUTPUT:
+	RETVAL
+
+#endif
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::InternetAddress	PREFIX=internet_address_
 
@@ -1331,7 +3013,7 @@ internet_address_new(Class, name, address)
         RETVAL
     CASE: items == 2
         char *		Class
-        gchar *		name
+        char *		name
     CODE:
         RETVAL = internet_address_new_group(name);
         plist = g_list_prepend(plist, RETVAL);
@@ -1339,8 +3021,8 @@ internet_address_new(Class, name, address)
         RETVAL
     CASE: items == 3
         char *		Class
-        gchar *		name
-        gchar *		address
+        char *		name
+        char *		address
     CODE:
         RETVAL = internet_address_new_name(name, address);
         plist = g_list_prepend(plist, RETVAL);
@@ -1352,21 +3034,21 @@ DESTROY(ia)
         MIME::Fast::InternetAddress	ia
     CODE:
         if (g_list_find(plist,ia)) {
-          internet_address_destroy(ia);
+          internet_address_unref(ia);
           plist = g_list_remove(plist, ia);
         }
 
 AV *
 internet_address_parse_string(str)
-        const gchar *		str
+        const char *		str
     PREINIT:
-        GList *		addrlist;
+        InternetAddressList *		addrlist;
         AV * 		retav;
     CODE:
         addrlist = internet_address_parse_string(str);
-        while (addrlist && addrlist->data) {
+        while (addrlist) {
           SV * address = newSViv(0);
-          sv_setref_pv(address, "MIME::Fast::InternetAddress", (MIME__Fast__InternetAddress)(addrlist->data));
+          sv_setref_pv(address, "MIME::Fast::InternetAddress", (MIME__Fast__InternetAddress)(addrlist->address));
           av_push(retav, address);
           addrlist = addrlist->next;
         }
@@ -1374,32 +3056,50 @@ internet_address_parse_string(str)
     OUTPUT:
         RETVAL
 
-gchar *
+
+void
+interface_ia_set(ia, value)
+        MIME::Fast::InternetAddress	ia
+	char *				value
+    INTERFACE_MACRO:
+	XSINTERFACE_FUNC
+	XSINTERFACE_FUNC_MIMEFAST_IA_SET
+    INTERFACE:
+	set_name
+	set_addr
+
+ #
+ # Unsupported functions:
+ # internet_address_list_prepend
+ # internet_address_list_append
+ # internet_address_list_concat
+ #
+ 
+SV *
 internet_address_to_string(ia, encode = TRUE)
         MIME::Fast::InternetAddress	ia
         gboolean		encode
-
-void
-internet_address_set_name(ia, name)
-        MIME::Fast::InternetAddress	ia
-        const gchar *		name
-
-void
-internet_address_set_addr(ia, addr)
-        MIME::Fast::InternetAddress	ia
-        const gchar *		addr
+    PREINIT:
+	char *		textdata;
+    CODE:
+	textdata = internet_address_to_string(ia, encode);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+	RETVAL = newSVpv(textdata, 0);
+    OUTPUT:
+	RETVAL
 
 void
 internet_address_set_group(ia, ...)
         MIME::Fast::InternetAddress	ia
     PREINIT:
         MIME__Fast__InternetAddress	addr;
-        GList *			addrlist = NULL;
+        InternetAddressList *		addrlist = NULL;
         int			i;
     CODE:
         if (items < 2) {
           croak("Usage: internet_address_set_group(InternetAddr, [InternetAddr]+");
-          return;
+	  XSRETURN_UNDEF;
         }
         for (i=items - 1; i>0; --i) {
           /* retrieve each address from the perl array */
@@ -1409,7 +3109,7 @@ internet_address_set_group(ia, ...)
           } else
             croak("Usage: internet_address_set_group(InternetAddr, [InternetAddr]+");
           if (addr)
-            g_list_append (addrlist, addr);
+            internet_address_list_append (addrlist, addr);
         }
         if (addrlist)
           internet_address_set_group(ia, addrlist);
@@ -1430,10 +3130,46 @@ internet_address_type(ia)
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Charset		PREFIX=g_mime_charset_
 
 void
-g_mime_charset_init()
+g_mime_charset_init(mime_charset)
+    MIME::Fast::Charset mime_charset
 
-gchar *
+const char *
 g_mime_charset_locale_name()
+
+ # needed only for non iso8859-1 locales
+void
+g_mime_charset_map_init()
+
+const char *
+g_mime_charset_name(charset)
+	const char *	charset
+
+void
+g_mime_charset_step(mime_charset, svtext)
+	MIME::Fast::Charset	mime_charset
+        SV *			svtext
+    PREINIT:
+	char *	data;
+	STRLEN	len;
+    CODE:
+        data = (char *)SvPV(svtext, len);
+	g_mime_charset_step(mime_charset, data, len);
+
+const char *
+g_mime_charset_best_name(mime_charset)
+	MIME::Fast::Charset mime_charset
+
+const char *
+g_mime_charset_best(svtext)
+        SV *	svtext
+    PREINIT:
+	char *	data;
+	STRLEN	len;
+    CODE:
+        data = (char *)SvPV(svtext, len);
+	RETVAL = g_mime_charset_best(data, len);
+    OUTPUT:
+	RETVAL
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::DataWrapper	PREFIX=g_mime_data_wrapper_
 
@@ -1447,7 +3183,7 @@ g_mime_data_wrapper_new(Class, mime_stream = 0, encoding = 0)
     	RETVAL
 
     CASE: items == 3
-        const gchar *		Class
+        const char *		Class
         MIME::Fast::Stream	mime_stream
         MIME::Fast::PartEncodingType		encoding
     CODE:
@@ -1455,20 +3191,6 @@ g_mime_data_wrapper_new(Class, mime_stream = 0, encoding = 0)
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
     	RETVAL
-
-void
-DESTROY(mime_data_wrapper)
-        MIME::Fast::DataWrapper	mime_data_wrapper
-    CODE:
-        if (g_list_find(plist,mime_data_wrapper)) {
-          g_mime_data_wrapper_destroy(mime_data_wrapper);
-          plist = g_list_remove(plist, mime_data_wrapper);
-        }
-
-long
-g_mime_data_wrapper_write_to_stream(mime_data_wrapper, mime_stream)
-        MIME::Fast::DataWrapper	mime_data_wrapper
-        MIME::Fast::Stream	mime_stream
 
 void
 g_mime_data_wrapper_set_stream(mime_data_wrapper, mime_stream)
@@ -1492,6 +3214,7 @@ MIME::Fast::PartEncodingType
 g_mime_data_wrapper_get_encoding(mime_data_wrapper)
         MIME::Fast::DataWrapper		mime_data_wrapper
 
+
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Stream		PREFIX=g_mime_stream_
 
  # partial support - TODO: maybe IO:: support
@@ -1508,13 +3231,12 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
     	RETVAL
-
     CASE: items == 2
-        const gchar *	Class
+        const char *	Class
         SV *		svmixed
     PREINIT:
         STRLEN		len;
-        gchar *		data;
+        char *		data;
         GMimeStream	*mime_stream = NULL;
         svtype		svvaltype;
         SV *		svval;
@@ -1527,14 +3249,19 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = IoIFP(sv_2io(svval));
+            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svmixed)));
 
             mime_stream = g_mime_stream_file_new(fp);
-        ((GMimeStreamFile *)mime_stream)->owner = FALSE;
+	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+	  } else if (svvaltype == SVt_PVMG) { // possible FILE * handle
+	    int fd = (int)SvIV( svval );
+
+            mime_stream = g_mime_stream_fs_new(fd);
+	    g_mime_stream_fs_set_owner (mime_stream, FALSE);
           } else if (SvPOK(svval)) {
-            data = (gchar *)SvPV(svmixed, len);
+            data = (char *)SvPV(svmixed, len);
             mime_stream = g_mime_stream_mem_new_with_buffer(data,len);
-          } else {
+	  } else {
             croak("stream_new: Unknown type: %d", (int)svvaltype);
           }
         }
@@ -1542,15 +3269,14 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
         RETVAL
-    
     CASE: items == 4
-        const gchar *	Class
+        const char *	Class
         SV *		svmixed
         off_t		start
         off_t		end
     PREINIT:
         STRLEN		len;
-        gchar *		data;
+        char *		data;
         GMimeStream	*mime_stream = NULL;
         svtype		svvaltype;
         SV *		svval;
@@ -1563,10 +3289,16 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = IoIFP(sv_2io(svval));
+            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
 
             mime_stream = g_mime_stream_file_new_with_bounds(fp, start, end);
-        ((GMimeStreamFile *)mime_stream)->owner = FALSE;
+	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+	  } else if (svvaltype == SVt_PVMG) { // possible FILE * handle
+	    int fd = (int)SvIV( svval );
+
+            mime_stream = g_mime_stream_fs_new_with_bounds(fd, start, end);
+	    g_mime_stream_fs_set_owner (mime_stream, FALSE);
+
           } else if (SvPOK(svval)) {
             warn ("stream_new: bounds for string are not supported");
           } else {
@@ -1583,8 +3315,15 @@ DESTROY(mime_stream)
         MIME::Fast::Stream	mime_stream
     CODE:
         if (g_list_find(plist,mime_stream)) {
-          g_mime_stream_unref(mime_stream);
-          plist = g_list_remove(plist, mime_stream);
+	    if (GMIME_IS_STREAM_FILE(mime_stream)) {
+		GMimeStreamFile *	fstream;
+
+		fstream = GMIME_STREAM_FILE (mime_stream);
+		fstream->owner = FALSE;
+		fstream->fp = NULL;
+	    }
+            g_mime_stream_unref(mime_stream);
+            plist = g_list_remove(plist, mime_stream);
         }
 
 MIME::Fast::Stream
@@ -1607,7 +3346,7 @@ g_mime_stream_set_bounds(mime_stream, start, end)
 long
 g_mime_stream_write_string(mime_stream, str)
         MIME::Fast::Stream	mime_stream
-        gchar *			str
+        char *			str
     CODE:
         RETVAL = g_mime_stream_write_string(mime_stream, str);
     OUTPUT:
@@ -1621,45 +3360,349 @@ g_mime_stream_length(mime_stream)
     OUTPUT:
         RETVAL
 
-long
-g_mime_stream_write_to_stream(mime_stream_src, mime_stream_dst)
+ssize_t
+g_mime_stream_write_to_stream(mime_stream_src, svstream)
         MIME::Fast::Stream	mime_stream_src
-        MIME::Fast::Stream	mime_stream_dst
+	SV *			svstream
+    PREINIT:
+        GMimeStream *		mime_stream_dst;
     CODE:
+	if (sv_derived_from(ST(1), "MIME::Fast::Stream")) {
+	    IV tmp = SvIV((SV*)SvRV(ST(1)));
+	    mime_stream_dst = INT2PTR(MIME__Fast__Stream,tmp);
+	}
+	else
+	    Perl_croak(aTHX_ "mime_stream is not of type MIME::Fast::Stream");
+	
         RETVAL = g_mime_stream_write_to_stream(mime_stream_src, mime_stream_dst);
     OUTPUT:
         RETVAL
 
+
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter		PREFIX=g_mime_filter_
 
- # partial support - almost none
+void
+DESTROY(mime_filter)
+        MIME::Fast::Filter	mime_filter
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_filter_DESTROY: 0x%x %s", mime_filter,
+	  g_list_find(plist,mime_filter) ? "(true destroy)" : "(only attempt)");
+	if (g_list_find(plist,mime_filter)) {
+	  g_object_unref (mime_filter);
+	  plist = g_list_remove(plist, mime_filter);
+	}
 
+ #
+ # Copies @filter into a new GMimeFilter object.
+ #
 MIME::Fast::Filter
-g_mime_filter_basic_new_type(type)
-        int			type
-
-MIME::Fast::Filter
-g_mime_filter_crlf_new(direction, mode)
-        int			direction
-        int			mode
+g_mime_filter_copy (filter);
+	MIME::Fast::Filter	filter
+    CODE:
+	RETVAL = g_mime_filter_copy (filter);
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
 
 void
-DESTROY(filter)
-        MIME::Fast::Filter	filter
+g_mime_filter_reset (filter)
+	MIME::Fast::Filter	filter
+
+void
+g_mime_filter_set_size (filter, size, keep)
+	MIME::Fast::Filter	filter
+	size_t			size
+	gboolean		keep
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Basic	PREFIX=g_mime_filter_basic_
+
+MIME::Fast::Filter::Basic
+g_mime_filter_basic_new(Class, type)
+	const char *			Class
+        int			type
     CODE:
-        g_mime_filter_destroy(filter);
+	RETVAL = GMIME_FILTER_BASIC(g_mime_filter_basic_new_type (type));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Best	PREFIX=g_mime_filter_best_
+
+MIME::Fast::Filter::Best
+g_mime_filter_best_new(Class, flags)
+	const char *		Class
+	unsigned int		flags
+    CODE:
+	RETVAL = GMIME_FILTER_BEST(g_mime_filter_best_new (flags));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+const char *
+g_mime_filter_best_charset(mime_filter_best)
+	MIME::Fast::Filter::Best	mime_filter_best
+
+MIME::Fast::PartEncodingType
+g_mime_filter_best_encoding(mime_filter_best, required)
+	MIME::Fast::Filter::Best	mime_filter_best
+	MIME::Fast::BestEncoding	required
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Charset	PREFIX=g_mime_filter_charset_
+
+MIME::Fast::Filter::Charset
+g_mime_filter_charset_new(Class, from_charset, to_charset)
+	const char *		Class
+	const char *		from_charset
+	const char *		to_charset
+    CODE:
+	RETVAL = GMIME_FILTER_CHARSET(g_mime_filter_charset_new (from_charset, to_charset));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::CRLF	PREFIX=g_mime_filter_crlf_
+
+MIME::Fast::Filter::CRLF
+g_mime_filter_crlf_new(Class, direction, mode)
+	const char *		Class
+        int			direction
+        int			mode
+    CODE:
+	RETVAL = GMIME_FILTER_CRLF(g_mime_filter_crlf_new (direction, mode));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::From	PREFIX=g_mime_filter_from_
+
+MIME::Fast::Filter::From
+g_mime_filter_from_new(Class, mode)
+	const char *			Class
+        MIME::Fast::FilterFromMode	mode
+    CODE:
+	RETVAL = GMIME_FILTER_FROM(g_mime_filter_from_new (mode));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+#if GMIME_CHECK_VERSION_2_0_9
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Func	PREFIX=g_mime_filter_func_
+
+ # unsupported:
+ # g_mime_filter_filter
+ # g_mime_filter_complete
+ # g_mime_filter_backup
+
+MIME::Fast::Filter::Func
+g_mime_filter_func_new(Class, svstep, svcomplete = 0, svsizeout = 0, svdata = 0)
+    CASE: items == 5
+    	const char *		Class
+        SV *			svstep
+	SV *			svcomplete
+	SV *			svsizeout
+        SV *			svdata
+    PREINIT:
+	struct _user_data_sv    *data;
+    CODE:
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svuser_data  = svdata;
+	data->svfunc  = svstep;
+	data->svfunc_complete = svcomplete;
+	data->svfunc_sizeout  = svsizeout;
+	RETVAL = g_mime_filter_func_new (call_filter_step_func,
+			call_filter_complete_func, call_filter_sizeout_func, data);
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+    CASE: items == 4
+    	const char *		Class
+        SV *			svstep
+	SV *			svcomplete
+	SV *			svsizeout
+    PREINIT:
+	struct _user_data_sv    *data;
+    CODE:
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svfunc  = svstep;
+	data->svfunc_complete = svcomplete;
+	data->svfunc_sizeout  = svsizeout;
+	RETVAL = g_mime_filter_func_new(call_filter_step_func,
+			call_filter_complete_func, call_filter_sizeout_func, data);
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+    CASE: items == 3
+    	const char *		Class
+        SV *			svstep
+	SV *			svcomplete
+    PREINIT:
+	struct _user_data_sv    *data;
+    CODE:
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svfunc  = svstep;
+	data->svfunc_complete = svcomplete;
+	RETVAL = g_mime_filter_func_new(call_filter_step_func,
+			call_filter_complete_func, NULL, data);
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+    CASE: items == 2
+    	const char *		Class
+        SV *			svstep
+    PREINIT:
+	struct _user_data_sv    *data;
+    CODE:
+	data = g_new0 (struct _user_data_sv, 1);
+	data->svfunc  = svstep;
+	data->svfunc_complete = svstep;
+	RETVAL = g_mime_filter_func_new(call_filter_step_func,
+			call_filter_complete_func, NULL, data);
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+#endif
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::HTML	PREFIX=g_mime_filter_html_
+
+MIME::Fast::Filter::HTML
+g_mime_filter_html_new(Class, flags, colour)
+	const char *		Class
+	guint32			flags
+	guint32			colour
+    CODE:
+	RETVAL = GMIME_FILTER_HTML(g_mime_filter_html_new(flags, colour));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Md5	PREFIX=g_mime_filter_md5_
+
+MIME::Fast::Filter::Md5
+g_mime_filter_md5_new(Class)
+	const char *		Class
+    CODE:
+	RETVAL = GMIME_FILTER_MD5(g_mime_filter_md5_new());
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+SV *
+g_mime_filter_md5_get_digest(mime_filter_md5)
+	MIME::Fast::Filter::Md5	mime_filter_md5
+    PREINIT:
+	unsigned char md5_digest[16];
+    CODE:
+	md5_digest[0] = '\0';
+	g_mime_filter_md5_get_digest (mime_filter_md5, md5_digest);
+	RETVAL = newSVpv(md5_digest, 0);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Strip	PREFIX=g_mime_filter_strip_
+
+MIME::Fast::Filter::Strip
+g_mime_filter_strip_new(Class)
+	const char *		Class
+    CODE:
+	RETVAL = GMIME_FILTER_STRIP(g_mime_filter_strip_new());
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Filter::Yenc	PREFIX=g_mime_filter_yenc_
+
+MIME::Fast::Filter::Yenc
+g_mime_filter_yenc_new(Class, direction)
+	const char *			Class
+	Mime::Fast::FilterYencDirection	direction
+    CODE:
+	RETVAL = GMIME_FILTER_YENC(g_mime_filter_yenc_new(direction));
+	plist = g_list_prepend (plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+ # unsupported (yet):
+ # g_mime_filter_yenc_get_crc etc.
+
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::StreamFilter	PREFIX=g_mime_stream_filter_
+
+MIME::Fast::StreamFilter
+g_mime_stream_filter_new(Class, mime_stream)
+	const char *			Class
+	MIME::Fast::Stream		mime_stream
+    CODE:
+	RETVAL = GMIME_STREAM_FILTER(g_mime_stream_filter_new_with_stream (mime_stream));
+	plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+	RETVAL
+
+int
+g_mime_stream_filter_add(mime_streamfilter, mime_filter)
+	MIME::Fast::StreamFilter	mime_streamfilter
+	MIME::Fast::Filter		mime_filter
+
+void
+g_mime_stream_filter_remove(mime_streamfilter, filter_num)
+	MIME::Fast::StreamFilter	mime_streamfilter
+	int				filter_num
+
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Parser		PREFIX=g_mime_parser_
 
+MIME::Fast::Parser
+g_mime_parser_new(Class = "MIME::Fast::Parser", mime_stream = 0)
+    CASE: items == 1
+	char *			Class;
+    CODE:
+	RETVAL = g_mime_parser_new();
+	plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+    CASE: items == 2
+	char *			Class;
+	MIME::Fast::Stream	mime_stream;
+    CODE:
+	RETVAL = g_mime_parser_new_with_stream(mime_stream);
+	plist = g_list_prepend(plist, RETVAL);
+    OUTPUT:
+        RETVAL
+
+ # destroy(mime_parser)
+void
+DESTROY(mime_parser)
+        MIME::Fast::Parser	mime_parser
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_parser_DESTROY: 0x%x %s", mime_parser,
+	  g_list_find(plist,mime_parser) ? "(true destroy)" : "(only attempt)");
+	if (g_list_find(plist,mime_parser)) {
+	  g_object_unref (mime_parser);
+	  plist = g_list_remove(plist, mime_parser);
+	}
+
+
 MIME::Fast::Message
-g_mime_parser_construct_message(svmixed, preserve_headers = TRUE)
+g_mime_parser_construct_message(svmixed)
         SV *		svmixed
-        gboolean	preserve_headers
     PREINIT:
         STRLEN		len;
-        gchar *		data;
+        char *		data;
         GMimeMessage	*mime_msg = NULL;
         GMimeStream	*mime_stream = NULL;
+        GMimeParser *parser = NULL;
         svtype		svvaltype;
         SV *		svval;
     CODE:
@@ -1671,12 +3714,23 @@ g_mime_parser_construct_message(svmixed, preserve_headers = TRUE)
 
         	mime_data_wrapper = INT2PTR(MIME__Fast__DataWrapper,tmp);
         	mime_stream = g_mime_data_wrapper_get_stream(mime_data_wrapper);
-          	mime_msg = g_mime_parser_construct_message(mime_stream, preserve_headers);
+                parser = g_mime_parser_new_with_stream(mime_stream);
+          	mime_msg = g_mime_parser_construct_message(parser);
+                g_mime_stream_unref(mime_stream);
+		g_object_unref (parser);
           } else if (sv_derived_from(svmixed, "MIME::Fast::Stream")) {
           	IV tmp = SvIV((SV*)SvRV(svmixed));
 
         	mime_stream = INT2PTR(MIME__Fast__Stream,tmp);
-          	mime_msg = g_mime_parser_construct_message(mime_stream, preserve_headers);
+
+                parser = g_mime_parser_new_with_stream(mime_stream);
+          	mime_msg = g_mime_parser_construct_message(parser);
+		g_object_unref (parser);
+          } else if (sv_derived_from(svmixed, "MIME::Fast::Parser")) {
+          	IV tmp = SvIV((SV*)SvRV(svmixed));
+
+        	parser = INT2PTR(MIME__Fast__Parser,tmp);
+          	mime_msg = g_mime_parser_construct_message(parser);
           }
           svval = SvRV(svmixed);
         }
@@ -1684,35 +3738,43 @@ g_mime_parser_construct_message(svmixed, preserve_headers = TRUE)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = IoIFP(sv_2io(svval));
+            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
 
             mime_stream = g_mime_stream_file_new(fp);
-            ((GMimeStreamFile *)mime_stream)->owner = FALSE;
-            mime_msg = g_mime_parser_construct_message(mime_stream, preserve_headers);
+	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_msg = g_mime_parser_construct_message(parser);
             g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
           } else if (SvPOK(svval)) {
-            data = (gchar *)SvPV(svval, len);
+            data = (char *)SvPV(svval, len);
             mime_stream = g_mime_stream_mem_new_with_buffer(data,len);
-            mime_msg = g_mime_parser_construct_message(mime_stream, preserve_headers);
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_msg = g_mime_parser_construct_message(parser);
             g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
           } else {
             croak("construct_message: Unknown type: %d", (int)svvaltype);
           }
         }
     	
         RETVAL = mime_msg;
+	if (gmime_debug)
+          warn("g_mime_parser_construct_message: 0x%x\n", RETVAL);
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
         RETVAL
 
-MIME::Fast::Part
+SV *
 g_mime_parser_construct_part(svmixed)
         SV *		svmixed
     PREINIT:
         STRLEN		len;
-        gchar *		data;
+        char *		data;
         GMimePart	*mime_part = NULL;
+        GMimeObject	*mime_object = NULL;
         GMimeStream	*mime_stream = NULL;
+        GMimeParser *parser = NULL;
         svtype		svvaltype;
         SV *		svval;
     CODE:
@@ -1724,12 +3786,22 @@ g_mime_parser_construct_part(svmixed)
 
         	mime_data_wrapper = INT2PTR(MIME__Fast__DataWrapper,tmp);
         	mime_stream = g_mime_data_wrapper_get_stream(mime_data_wrapper);
-          	mime_part = g_mime_parser_construct_part(mime_stream);
+                parser = g_mime_parser_new_with_stream(mime_stream);
+          	mime_object = g_mime_parser_construct_part(parser);
+                g_mime_stream_unref(mime_stream);
+		g_object_unref (parser);
           } else if (sv_derived_from(svmixed, "MIME::Fast::Stream")) {
           	IV tmp = SvIV((SV*)SvRV(svmixed));
 
         	mime_stream = INT2PTR(MIME__Fast__Stream,tmp);
-          	mime_part = g_mime_parser_construct_part(mime_stream);
+                parser = g_mime_parser_new_with_stream(mime_stream);
+          	mime_object = g_mime_parser_construct_part(parser);
+		g_object_unref (parser);
+          } else if (sv_derived_from(svmixed, "MIME::Fast::Parser")) {
+          	IV tmp = SvIV((SV*)SvRV(svmixed));
+
+        	parser = INT2PTR(MIME__Fast__Parser,tmp);
+          	mime_object = g_mime_parser_construct_part(parser);
           }
           svval = SvRV(svmixed);
         }
@@ -1737,33 +3809,153 @@ g_mime_parser_construct_part(svmixed)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = IoIFP(sv_2io(svval));
+            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
 
             mime_stream = g_mime_stream_file_new(fp);
-        ((GMimeStreamFile *)mime_stream)->owner = FALSE;
-            mime_part = g_mime_parser_construct_part(mime_stream);
+	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_object = g_mime_parser_construct_part(parser);
             g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
           } else if (SvPOK(svval)) {
-            data = (gchar *)SvPV(svmixed, len);
+            data = (char *)SvPV(svmixed, len);
             mime_stream = g_mime_stream_mem_new_with_buffer(data,len);
-            mime_part = g_mime_parser_construct_part(mime_stream);
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_object = g_mime_parser_construct_part(parser);
             g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
           } else {
             croak("construct_part: Unknown type: %d", (int)svvaltype);
           }
         }
     	
-        RETVAL = mime_part;
+	RETVAL = newSViv(0);
+
+        if (GMIME_IS_MULTIPART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MultiPart", (MIME__Fast__MultiPart)mime_object);
+	else if (GMIME_IS_MESSAGE_PART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessagePart", (MIME__Fast__MessagePart)mime_object);
+	else if (GMIME_IS_MESSAGE_PARTIAL(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::MessagePartial", (MIME__Fast__MessagePartial)mime_object);
+	else if (GMIME_IS_PART(mime_object))
+	  sv_setref_pv(RETVAL, "MIME::Fast::Part", (MIME__Fast__Part)mime_object);
+	else
+	  die("g_mime_parser_construct_part: unknown type of object: 0x%x", mime_object);
+        
+	if (gmime_debug)
+          warn("g_mime_parser_construct_part: 0x%x mo=%p\n", RETVAL, mime_object);
+        plist = g_list_prepend(plist, mime_object);
+    OUTPUT:
+        RETVAL
+
+void
+g_mime_parser_init_with_stream(parser, mime_stream)
+	MIME::Fast::Parser	parser
+	MIME::Fast::Stream	mime_stream
+
+void
+g_mime_parser_set_scan_from(parser, scan_from)
+	MIME::Fast::Parser	parser
+	gboolean		scan_from
+
+gboolean
+g_mime_parser_get_scan_from(parser)
+	MIME::Fast::Parser	parser
+
+ # position
+off_t
+g_mime_parser_tell(parser)
+	MIME::Fast::Parser	parser
+
+gboolean
+g_mime_parser_eos(parser)
+	MIME::Fast::Parser	parser
+
+SV *
+g_mime_parser_get_from(parser)
+	MIME::Fast::Parser	parser
+    PREINIT:
+	char *		textdata = NULL;
+    CODE:
+	textdata = g_mime_parser_get_from(parser);
+	if (textdata == NULL)
+	  XSRETURN_UNDEF;
+	RETVAL = newSVpv(textdata, 0);
+    OUTPUT:
+	RETVAL
+
+off_t
+g_mime_parser_get_from_offset(parser)
+	MIME::Fast::Parser	parser
+
+MODULE = MIME::Fast		PACKAGE = MIME::Fast::Disposition	PREFIX=g_mime_disposition_
+
+MIME::Fast::Disposition
+g_mime_disposition_new(Class, disposition)
+        char *		Class
+	const char *	disposition
+    CODE:
+        RETVAL = g_mime_disposition_new (disposition);
         plist = g_list_prepend(plist, RETVAL);
     OUTPUT:
         RETVAL
+
+# destroy(mime_disposition)
+void
+DESTROY(mime_disposition)
+        MIME::Fast::Disposition	mime_disposition
+    CODE:
+        if (gmime_debug)
+          warn("g_mime_disposition_DESTROY: 0x%x %s", mime_disposition,
+	  g_list_find(plist,mime_disposition) ? "(true destroy)" : "(only attempt)");
+	if (g_list_find(plist,mime_disposition)) {
+	  g_mime_disposition_destroy (mime_disposition);
+	  plist = g_list_remove(plist, mime_disposition);
+	}
+
+void
+g_mime_disposition_set(mime_disposition, value)
+	MIME::Fast::Disposition	mime_disposition
+	const char *		value
+
+const char *
+g_mime_disposition_get(mime_disposition)
+	MIME::Fast::Disposition	mime_disposition
+
+void
+g_mime_disposition_add_parameter(mime_disposition, attribute, value)
+	MIME::Fast::Disposition	mime_disposition
+	const char *		attribute
+	const char *		value
+
+const char *
+g_mime_disposition_get_parameter(mime_disposition, attribute)
+	MIME::Fast::Disposition	mime_disposition
+	const char *		attribute
+
+SV *
+g_mime_disposition_header(mime_disposition, fold)
+	MIME::Fast::Disposition	mime_disposition
+	gboolean		fold
+    PREINIT:
+        char *		out = NULL;
+    CODE:
+        out = g_mime_disposition_header(mime_disposition, fold);
+        if (out) {
+          RETVAL = newSVpvn(out,0);
+          g_free(out);
+        } else
+          RETVAL = &PL_sv_undef;
+    OUTPUT:
+        RETVAL
+
 
 MODULE = MIME::Fast		PACKAGE = MIME::Fast::Utils		PREFIX=g_mime_utils_
 
 # date
 time_t
 g_mime_utils_header_decode_date(in, saveoffset)
-        const gchar *	in
+        const char *	in
         gint 		&saveoffset
     OUTPUT:
         saveoffset
@@ -1773,28 +3965,57 @@ g_mime_utils_header_format_date(time, offset)
         time_t		time
         gint		offset
     PREINIT:
-        gchar *		out = NULL;
+        char *		out = NULL;
     CODE:
         out = g_mime_utils_header_format_date(time, offset);
         if (out) {
-          RETVAL = sv_2mortal(newSVpvn(out,0));
+          RETVAL = newSVpvn(out,0);
           g_free(out);
         } else
           RETVAL = &PL_sv_undef;
     OUTPUT:
         RETVAL
-        
+
+
+SV *
+g_mime_utils_generate_message_id(fqdn)
+	const char *	fqdn
+    PREINIT:
+        char *		out = NULL;
+    CODE:
+	out = g_mime_utils_generate_message_id(fqdn);
+	if (!out)
+	  XSRETURN_UNDEF;
+	RETVAL = newSVpv(out, 0);
+	g_free(out);
+    OUTPUT:
+        RETVAL
+
+
+SV *
+g_mime_utils_decode_message_id(message_id)
+	const char *	message_id
+    PREINIT:
+        char *		out = NULL;
+    CODE:
+	out = g_mime_utils_decode_message_id(message_id);
+	if (!out)
+	  XSRETURN_UNDEF;
+	RETVAL = newSVpv(out, 0);
+	g_free(out);
+    OUTPUT:
+        RETVAL
 
 # headers
 SV *
 g_mime_utils_header_fold(in)
-        const gchar *	in
+        const char *	in
     PREINIT:
-        gchar *		out = NULL;
+        char *		out = NULL;
     CODE:
         out = g_mime_utils_header_fold(in);
         if (out) {
-          RETVAL = sv_2mortal(newSVpvn(out,0));
+          RETVAL = newSVpvn(out,0);
           g_free(out);
         } else
           RETVAL = &PL_sv_undef;
@@ -1807,14 +4028,15 @@ g_mime_utils_header_fold(in)
 # quote
 SV *
 g_mime_utils_quote_string(in)
-        const gchar *	in
+        const char *	in
     PREINIT:
-        gchar *		out = NULL;
+        char *		out = NULL;
     CODE:
         out = g_mime_utils_quote_string(in);
-        warn("In=%s Out=%s\n", in, out);
+	if (gmime_debug)
+          warn("In=%s Out=%s\n", in, out);
         if (out) {
-          RETVAL = newSVpv(out,0);
+          RETVAL = newSVpv(out, 0);
           g_free(out);
         } else
           RETVAL = &PL_sv_undef;
@@ -1823,7 +4045,7 @@ g_mime_utils_quote_string(in)
 
 void
 g_mime_utils_unquote_string(str)
-        gchar *		str
+        char *		str
     OUTPUT:
         str
 
@@ -1852,15 +4074,15 @@ g_mime_utils_best_encoding(str)
     OUTPUT:
         RETVAL
 
-gchar *
+char *
 g_mime_utils_8bit_header_decode(in)
         const guchar *	in
 
-gchar *
+char *
 g_mime_utils_8bit_header_encode(in)
         const guchar *	in
 
-gchar *
+char *
 g_mime_utils_8bit_header_encode_phrase(in)
         const guchar *	in
 
@@ -1890,306 +4112,5 @@ g_mime_utils_8bit_header_encode_phrase(in)
 # g_mime_utils_quoted_encode_step
 # g_mime_utils_quoted_encode_close
 
-MODULE = MIME::Fast		PACKAGE = MIME::Fast::Hash::Header		PREFIX=hash_
-
-MIME::Fast::Hash::Header
-hash_TIEHASH(Class, objptr)
-        gchar *			Class
-        MIME::Fast::Message		objptr
-    PREINIT:
-        hash_header *		hash;
-    CODE:
-        hash = g_malloc(sizeof(hash_header));
-        hash->keyindex = 0;
-        hash->objptr = objptr;
-        if (gmime_debug)
-        warn("function hash_TIEHASH(%s, 0x%x) returns 0x%x\n", Class, objptr, hash);
-        RETVAL = hash;
-    OUTPUT:
-        RETVAL
-
-void
-hash_DESTROY(obj)
-        MIME::Fast::Hash::Header	obj
-    CODE:
-        if (gmime_debug)
-        warn("function hash_DESTROY(0x%x)\n", obj);
-        obj->objptr = NULL;
-        g_free(obj);
-
-void
-hash_FETCH(obj, key)
-        MIME::Fast::Hash::Header	obj
-        const gchar *		key
-    PREINIT:
-        MIME__Fast__Message		msg;
-        gchar *			ret;
-        GList			*gret = NULL, *item;
-        AV *			retav;
-        I32			gimme = GIMME_V;
-    PPCODE:
-        msg = obj->objptr;
-
-        /* THE HACK - FETCH method would get value indirectly from NEXTKEY */
-        if (obj->keyindex != -1 && obj->fetchvalue != NULL) {
-          XPUSHs(sv_2mortal(newSVpv(obj->fetchvalue,0)));
-          obj->fetchvalue == NULL;
-          XSRETURN(1);
-        }
-
-        obj->fetchvalue = NULL;
-        
-        gret = message_get_header(msg, key);
-        if (gmime_debug)
-          warn("hash_FETCH(0x%x, '%s', items=%d)", obj, key ? key : "NULL", items);
-
-        if (!gret || gret->data == NULL) {
-          if (gmime_debug)
-            warn("fetch returns undef\n");
-          
-          if (gret)
-            g_list_free(gret);
-          
-          XSRETURN(0);
-        } else {
-          if (gret->next == NULL) { // one value
-            XPUSHs(sv_2mortal(newSVpv((gchar *)(gret->data),0)));
-          } else {
-            if (gimme == G_ARRAY) {
-              item = gret;
-              while (item && item->data) {
-                XPUSHs(sv_2mortal(newSVpv((gchar *)(item->data),0)));
-                item = item->next;
-              }
-            } else if (gimme == G_SCALAR) {
-              retav = newAV();
-              item = gret;
-              while (item && item->data) {
-                av_push(retav, newSVpv((gchar *)g_strdup((item->data)), 0));
-                item = item->next;
-              }
-              XPUSHs(newRV_noinc((SV *)retav));
-            }
-          }
-        }
-        if (gret) {
-          item = gret;
-          while (item) {
-            if (item->data)
-              g_free((gchar *)(item->data));
-            item = item->next;
-          }
-          g_list_free(gret);
-        }
-
-void
-hash_STORE(obj, key, svmixed)
-        MIME::Fast::Hash::Header	obj
-        const gchar *		key
-        SV *			svmixed
-    PREINIT:
-        MIME__Fast__Message		msg;
-        gchar *			value;
-        AV *			avvalue;
-        SV *			svvalue;
-        svtype			svvaltype;
-        STRLEN			vallen;
-    CODE:
-        /* only one value can be stored - no arrays allowed by perl */
-        msg = obj->objptr;
-
-        svvalue = svmixed;
-        if (SvROK(svmixed)) {
-          svvalue = SvRV(svmixed);
-        }
-        svvaltype = SvTYPE(svvalue);
-
-        if (SvGMAGICAL(svvalue)) {
-          if (gmime_debug)
-            warn("hash_STORE: mg_get sv magical");
-          mg_get(svvalue);
-        }
-        
-        // TEST: display sv value
-        if (gmime_debug)
-          warn_type(svvalue, "hash_STORE");
-
-        /* delete header for the first array item */
-        message_remove_header(msg, key);
-
-        if (svvaltype == SVt_PVAV) {
-          AV *	avvalue;
-          I32		i, avlen;
-          SV *	svtmp;
-
-          /* set header */
-          avvalue = (AV *)svvalue;
-          avlen = av_len(avvalue);
-          for (i=0; i<=avlen; ++i) {
-            svtmp = (SV *)(*(av_fetch(avvalue, i, 0)));
-
-            if (SvGMAGICAL(svtmp)) {
-              if (gmime_debug)
-                warn("hash_STORE(AV): mg_get sv magical");
-              mg_get(svtmp);
-            }
-            
-            if (svtmp && SvPOKp(svtmp)) {
-              value = (gchar *)SvPV(svtmp, vallen);
-              message_set_header(msg, key, value);
-            }
-          }
-        } else if (SvPOK(svvalue) || SvIOK(svvalue) || SvNOK(svvalue)) {
-          value = (gchar *)SvPV(svvalue, vallen);
-          message_set_header(msg, key, value);
-        } else { /* assume scalar value */
-          /* undefined value -> remove header */
-          if (!(SvOK(svvalue)))
-            message_remove_header(msg, key);
-          else if (!(SvPOKp(svvalue)))
-            croak("hash_STORE: Unknown sv type: %d for field %s 0x%x/0x%x/0x%x",
-              SvTYPE(svvalue), key, &svvalue, &PL_sv_undef, svvalue);
-        }
-        if (gmime_debug)
-          warn("hash_STORE: %s(0x%x) = %s\n", key, svvalue, SvPV(svvalue, vallen));
-
-gboolean
-hash_EXISTS(obj, key)
-        MIME::Fast::Hash::Header	obj
-        const gchar *		key
-    PREINIT:
-        MIME__Fast__Message		msg;
-        gchar *			ret;
-        GList			*gret, *item;
-    CODE:
-        msg = obj->objptr;
-        if (gmime_debug)
-         warn("hash_EXISTS(%s)\n", key);
-        gret = message_get_header(msg, key);
-        RETVAL = (gret != NULL && gret->data != NULL);
-        if (gret) {
-          item = gret;
-          while (item) {
-            if (item->data)
-              g_free((gchar *)(item->data));
-            item = item->next;
-          }
-          g_list_free(gret);
-        }
-    OUTPUT:
-        RETVAL
-
-void
-hash_DELETE(obj, key)
-        MIME::Fast::Hash::Header	obj
-        const gchar *		key
-    CODE:
-        if (gmime_debug)
-        warn("hash_DELETE %s\n", key);
-        message_remove_header((MIME__Fast__Message) obj->objptr, key);
-
-void
-hash_NEXTKEY(obj, lastkey = NULL)
-        MIME::Fast::Hash::Header	obj
-        const gchar *		lastkey
-    ALIAS:
-        MIME::Fast::Hash::Header::FIRSTKEY = 1
-    PREINIT:
-        gchar *			key = NULL;
-        gchar *			value = NULL;
-        MIME__Fast__Message		msg;
-        I32			gimme = GIMME_V;
-        gint			i, j, found;
-        local_GMimeHeader *		header;
-        struct raw_header	*h;
-    INIT:
-        if (ix == 1) {
-          obj->keyindex = -1;
-        }
-    PPCODE:
-        msg = obj->objptr;
-        ++obj->keyindex;
-        if (gmime_debug)
-          warn("hash_NEXTKEY");
-        i = obj->keyindex;
-        header = msg->header->headers;
-
-        h = header->headers;
-        j = 0;
-        found = 0;
-        while (h) {
-          if (j >= i) {
-            key = h->name;
-            value = h->value;
-            found = 1;
-            break;
-          }
-          j++;
-          h = h->next;
-        }
-        
-        if (!found && key == NULL) {
-          obj->keyindex = -1;
-        }
-
-        if (gimme != G_SCALAR && !value) {
-          // TODO: does each, keys, retrieves the value?
-          // retrieve the value
-          warn("Error: NEED TO RETRIEVE THE VALUE, contact the author\n");
-        }
-        
-        /* THE HACK - FETCH method would get value indirectly */
-        obj->fetchvalue = NULL;
-
-        if (key) {
-          XPUSHs(sv_2mortal(newSVpv(key,0)));
-          if (gimme != G_SCALAR && value)
-            XPUSHs(sv_2mortal(newSVpv(value,0)));
-          /* THE HACK - FETCH method would get value indirectly */
-          obj->fetchvalue = value;
-        }
-        if (gmime_debug)
-          warn("hash_%s(0x%x, %s) = (\"%s\",\"%s\") key no. %d%s",
-        	(ix == 1) ? "FIRSTKEY" : "NEXTKEY",
-        	obj, lastkey ? lastkey : "NULL",
-        	key ? key : "NULL",
-        	value ? value : "NULL",
-        	i, obj->keyindex == -1 ? " (last)" : "");
-
-
-
-void
-hash_CLEAR(obj)
-        MIME::Fast::Hash::Header	obj
-    PREINIT:
-        MIME__Fast__Message		message;
-        gint			i;
-        local_GMimeHeader		*header;
-        struct raw_header	*h;
-    CODE:
-        message = obj->objptr;
-        if (gmime_debug)
-        warn("function hash_CLEAR(0x%x)\n", obj);
-        
-        g_free (message->header->from);
-        message->header->from = NULL;
-
-        g_free (message->header->reply_to);
-        message->header->reply_to = NULL;
-        
-        /* destroy all recipients */
-        g_hash_table_foreach_remove (message->header->recipients, recipients_destroy, NULL);
-        //g_hash_table_destroy (message->header->recipients);
-        //message->header->recipients = g_hash_table_new (g_str_hash, g_str_equal);	
-        
-        g_free (message->header->subject);
-        message->header->subject = NULL;
-        
-        g_free (message->header->message_id);
-        message->header->message_id = NULL;
-
-        /* free all the headers */
-        header = message->header->headers;
-        g_mime_header_destroy(header);
-        message->header->headers = g_mime_header_new ();
+INCLUDE: Fast-Hash.xs
 

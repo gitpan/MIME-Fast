@@ -7,29 +7,55 @@ MIME::Fast - Parsing MIME messages (wrapper for C gmime library)
 
   use MIME::Fast;
 
-  my $stream = MIME::Fast::Stream->new($data);
-  my $msg = MIME::Fast::Parser::construct_message($stream, 1);
-  $msg->set_subject( 'Re: ' . $msg->get_subject() );
+  open (FH,"<test.eml") || die "Can not open test.eml: $!";
+  
+  # create a stream
+  my $str = new MIME::Fast::Stream (\*FH);
+  # do not use/close FH now
+  # with gmime 2.0.8 close(FH) would even fail
+  # after $str destruction
+  
+  # construct message object
+  my $msg = MIME::Fast::Parser::construct_message ($str);
+
+  $msg->set_subject ( 'Re: ' . $msg->get_subject () );
 
   print 'Content-Type of message is ' .
-    $msg->mime_part->get_content_type->to_string . "\n";
+    $msg->get_mime_part->get_content_type->to_string . "\n";
 
-  $part = $msg->mime_part;
-  $part = $part->get_subpart_by_number(0,3,1);
+  my $part = $msg->get_mime_part;
+  print "Part=$part\n";
+  
+  if (ref $part eq 'MIME::Fast::MultiPart') {
+    $part = $part->get_part(0,0);
+    print "Subpart=$part\n";
+  }
 
+  my %header;
   tie %header, 'MIME::Fast::Hash::Header', $msg;
   $header{'From'} = 'John Doe <john@domain>';
   $header{'X-Info'} = 'Normal one arbitrary header';
   $header{'X-Info'} = ['This is','Multiline X-Info header'];
-  $old_header = $header{'X-Info'};
-  $header{'X-Info'} = [ @{$old_header}, 'New header line'];
+  print "X-Info: " . $header{'X-Info'};
+  print "\n";
+  print "X-Info header array: (" . join("; ", @{$header{'X-Info'}}) . ")\n";
+  my $old_header = $header{'X-Info'};
+  $header{'X-Info'} = [ 'First header', @{$old_header}, 'Last header'];
+  print "X-Info header array: (" . join("; ", @{$header{'X-Info'}}) . ")\n";
+  print "\n";
+  print "-- NEW HEADERS:\n";
+  print $msg->get_headers();
 
 
 =head1 DESCRIPTION
 
+WARNING: This documentation is in under-update state. Some things
+could be out of date, new objects are not described yet. But the above
+example works well.
+
 MIME::Fast is a perl module for creating, editing and parsing MIME messages.
 This module is based on the very good C library called
-gmime (currently in development). MIME::Fast outght to be faster and should
+gmime. MIME::Fast outght to be faster and should
 use less memory and CPU resources than standard MIME (perl module),
 because MIME::Fast is the wrapper for C functions (calling C function
 is much, much less expensive than calling perl function).
@@ -43,11 +69,11 @@ could change.
 
 =over 4
 
-=item I<construct_message>(text, preserve_headers = 1)
+=item I<construct_message>(text)
 
-=item I<construct_message>(FILE, preserve_headers = 1)
+=item I<construct_message>(FILE)
 
-=item I<construct_message>($mime_stream, preserve_headers = 1)
+=item I<construct_message>($mime_stream)
 
 Returns a MIME::Fast::Message class based on the given text,
 file handle, or MIME::Fast::Stream object.
@@ -431,25 +457,26 @@ destroyed (in which case the extracted part would not exists).
 =item I<parts> (index)
 
 I<(Alias functions - do the same)>
-Returns the number of children parts in the multipart MIME::Fast::Part
+Returns the number of children parts (just like get_number() ) in the MIME::Fast::MultiPart
 in scalar contents. In array context returns the array of subparts.
 If the index number argument is given, method returns subpart of that index.
 Numbers are counted from 0 to number of parts minus one.
 
-=item I<get_subpart_by_number> (index, ...)
+=item I<get_part> (index, ...)
 
 I<Instance method.>
 Returns the subpart from the multipart mime part
 based on the given index number/s.
 E.g.
 
-    mime_part->get_subpart_by_number(0,2,1)
+    mime_part->get_part(0,2,1)
 
 would return the "X" part:
 
-    mime_part
+  message
+  +--- mime_part
     |
-    +--- part "0"
+    +--- part "0" (multipart/*)
     | |
     | +--- part "0,0"
     | +--- part "0,1"
@@ -459,8 +486,14 @@ would return the "X" part:
     | | +--- part "0,2,1" ("X")
     | | +--- part "0,2,2"
     | +--- part "0,3"
-    +--- part "1"
+    +--- part "1" (message/rfc822)
+      +--- part "1,0"
+      +--- part "1,1"
     +--- part "2"
+
+The function can return MIME::Fast::Part, MIME::Fast::MultiPart,
+MIME::Fast::MessagePartial, MIME::Fast::MessagePart or
+any other MIME::Fast::Object object.
 
 =item I<is_multipart> ()
 
@@ -748,7 +781,7 @@ Then you can use tied hash as if it is normal hash variable.
 
 E.g.
 
-    $msg = MIME::Fast::Parser->construct_message($stream, 1);
+    $msg = MIME::Fast::Parser->construct_message($stream);
     tie %header, 'MIME::Fast::Hash::Header', $msg;
     $header{'From'} = 'John Doe <john@domain>';
     undef $header{'From'}; # delete From header from the message
@@ -775,6 +808,35 @@ E.g.
     INTERNET_ADDRESS_NAME
     INTERNET_ADDRESS_GROUP
 
+=head1 UNDOCUMENTED
+
+Undocumented yet are new objects:
+     + MIME::Fast::Object
+     + MIME::Fast::MessagePart
+     + MIME::Fast::MessagePartial
+     + MIME::Fast::Disposition
+     + MIME::Fast::StreamFilter
+     + MIME::Fast::Filter::Basic
+     + MIME::Fast::Filter::Best
+     + MIME::Fast::Filter::Charset
+     + MIME::Fast::Filter::CRLF
+     + MIME::Fast::Filter::From
+     + MIME::Fast::Filter::HTML
+     + MIME::Fast::Filter::Md5
+     + MIME::Fast::Filter::Strip
+     + MIME::Fast::Filter::Yenc
+     + MIME::Fast::Charset
+
+=head1 REQUIREMENTS
+
+This module MIME::Fast version 0.2 requires perl 5.8.x and gmime 2.0.8.
+
+=head1 DEVELOPMENT
+
+If something goes wrong, you can edit Fast.xs file, and set
+gmime_debug static variable to 1, to see some debug messages
+during object creation destruction etc.
+
 =head1 BUGS
 
 Quoted-printable binary parts could be wrongly decoded (when
@@ -783,14 +845,17 @@ at the end of line. RFC says that binary parts should be encoded with
 BASE64 not Q-P (it is also best compression for such parts).
 Then there is no harm.
 
+Closing a filehandle can fail (with gmime version <=2.0.8)
+if it is previously passed to the MIME::Fast::Stream or Parser.
+
 =head1 AUTHOR
 
-Piotr Klaban, info@klaban.torun.pl
+Piotr Klaban, post@klaban.torun.pl
 
 =head1 SEE ALSO
 
 perl(1).
 
-The homepage of gmime C library at http://www.xtorshun.org/gmime
+The homepage of gmime C library at http://spruce.sourceforge.net/gmime/
 The homepage of MIME::Fast perl module is available at http://www.klaban.torun.pl/prog/MIME::Fast/
 

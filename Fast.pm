@@ -1,6 +1,7 @@
 package MIME::Fast;
 
 use strict;
+use warnings;
 use Carp;
 use vars qw($VERSION @ISA @EXPORT @EXPORT_OK $AUTOLOAD);
 
@@ -8,7 +9,9 @@ require Exporter;
 require DynaLoader;
 require AutoLoader;
 
-@ISA = qw(Exporter DynaLoader);
+use 5.008; # require perl v5.8.0 or higher
+
+our @ISA = qw(Exporter DynaLoader);
 # Items to export into callers namespace by default. Note: do not export
 # names by default without a very good reason. Use EXPORT_OK instead.
 # Do not simply export all your public functions/methods/constants.
@@ -18,7 +21,7 @@ $MIME::Fast::GMIME_RECIPIENT_TYPE_TO = 'To';
 $MIME::Fast::GMIME_RECIPIENT_TYPE_CC = 'Cc';
 $MIME::Fast::GMIME_RECIPIENT_TYPE_BCC = 'Bcc';
 
-@EXPORT = qw(
+our @EXPORT = qw(
 	$GMIME_RECIPIENT_TYPE_TO
 	$GMIME_RECIPIENT_TYPE_CC
 	$GMIME_RECIPIENT_TYPE_BCC
@@ -41,7 +44,7 @@ $MIME::Fast::GMIME_RECIPIENT_TYPE_BCC = 'Bcc';
 	INTERNET_ADDRESS_NAME
 	INTERNET_ADDRESS_GROUP
 );
-$VERSION = '0.1';
+our $VERSION = '0.2';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()
@@ -51,6 +54,9 @@ sub AUTOLOAD {
     my $constname;
     ($constname = $AUTOLOAD) =~ s/.*:://;
     my $val = constant($constname, @_ ? $_[0] : 0);
+    if ($! != 0 || $! =~ /Invalid/) {
+      $val = MIME::Fast::constant_string($constname, @_ ? $_[0] : 0);
+    }
     if ($! != 0) {
 	if ($! =~ /Invalid/) {
 	    $AutoLoader::AUTOLOAD = $AUTOLOAD;
@@ -66,16 +72,34 @@ sub AUTOLOAD {
 
 bootstrap MIME::Fast $VERSION;
 
-# Preloaded methods go here.
+package main;
+
+@MIME::Fast::DataWrapper::ISA     = qw(MIME::Fast::Object);
+@MIME::Fast::Message::ISA         = qw(MIME::Fast::Object);
+@MIME::Fast::MessagePart::ISA     = qw(MIME::Fast::Object);
+@MIME::Fast::MultiPart::ISA       = qw(MIME::Fast::Object);
+#@MIME::Fast::MultipartEncrypted::ISA = qw(MIME::Fast::Object);
+#@MIME::Fast::MultipartSigned::ISA = qw(MIME::Fast::Object);
+@MIME::Fast::Part::ISA            = qw(MIME::Fast::Object);
+@MIME::Fast::MessagePartial::ISA  = qw(MIME::Fast::Part);
+@MIME::Fast::MessageDelivery::ISA = qw(MIME::Fast::Part);
+@MIME::Fast::MessageMDN::ISA      = qw(MIME::Fast::Part);
+@MIME::Fast::Parser::ISA          = qw(MIME::Fast::Object);
+@MIME::Fast::Stream::ISA 	  = qw(MIME::Fast::Object);
+@MIME::Fast::StreamFilter::ISA 	  = qw(MIME::Fast::Stream);
+@MIME::Fast::Filter::ISA 	  = qw(MIME::Fast::Object);
+@MIME::Fast::Filter::Basic::ISA   = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Best::ISA    = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Charset::ISA = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Crlf::ISA    = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::From::ISA    = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Func::ISA    = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Html::ISA    = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Md5::ISA     = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Strip::ISA   = qw(MIME::Fast::Filter);
+@MIME::Fast::Filter::Yenc::ISA    = qw(MIME::Fast::Filter);
 
 package MIME::Fast::Message;
-
-sub new {
-  my $class = shift;
-  my $hash = shift;
-  my $self = _new($class);
-  return $self;
-}
 
 sub sendmail {
   my $msg = shift;
@@ -98,7 +122,7 @@ sub sendmail {
   untie(%headers);
 }
 
-package MIME::Fast::Part;
+package MIME::Fast::MultiPart;
 
 sub is_multipart {
   my $self = shift;
@@ -117,12 +141,24 @@ sub effective_type {
 sub get_mime_struct {
   my ($part, $maxdepth, $depth) = @_;
   my $ret = "";
+  my $part2;
   
   $depth = 0 if not defined $depth;
   $maxdepth = 3 if not defined $maxdepth;
   return if ($depth > $maxdepth);
   my $space = "   " x $depth;
   #my $type = $part; # ->get_content_type();
+  my $object_type = MIME::Fast::get_object_type($part);
+  # warn "Type of $part is $object_type";
+  if ($object_type eq 'MIME::Fast::MessagePart') {
+    my $message = $part->get_message();
+    $part2 = $part;
+    $part = $message->get_mime_part();
+    $ret .= $space . 'Message/rfc822 part' . "\n";
+    $ret .= $space . "--\n";
+    $depth++;
+    $space = "   " x $depth;
+  }
   my $type = $part->get_content_type();
   $ret .= $space . "Content-Type: " . $type->type . "/" . $type->subtype . "\n";
   if ($type->is_type("multipart","*")) {
@@ -148,4 +184,3 @@ package MIME::Fast;
 
 1;
 __END__
-

@@ -1,0 +1,63 @@
+
+Thu, Jun 12 2003
+ * finished fixing bugs, and update to gmime 2.0.8
+ * Fast.xs:
+   - new function constat_string for string constants
+   - new GMime objects/types:
+     = enums:
+     + MIME::Fast::BestEncoding 
+     + MIME::Fast::FilterFromMode
+     + Mime::Fast::FilterYencDirection
+     = objects/types:
+     + MIME::Fast::Object
+     + MIME::Fast::Parser
+     + MIME::Fast::MultiPart
+     + MIME::Fast::MessagePart
+     + MIME::Fast::MessagePartial
+     + MIME::Fast::Disposition
+     + MIME::Fast::StreamFilter
+     + MIME::Fast::Filter::Basic
+     + MIME::Fast::Filter::Best
+     + MIME::Fast::Filter::Charset
+     + MIME::Fast::Filter::CRLF
+     + MIME::Fast::Filter::From
+     + MIME::Fast::Filter::HTML
+     + MIME::Fast::Filter::Md5
+     + MIME::Fast::Filter::Strip
+     + MIME::Fast::Filter::Yenc
+     + MIME::Fast::Charset
+   - thread safe _foreach method calls (uses no static variable)
+   - fixed destruction problems (gmime v2 uses now GLib object references)
+   - new methods:
+     + MIME::Fast::Param->append(name, value)
+     + MIME::Fast::Param->append_param(param)
+     + MIME::Fast::Param->write_to_string(fold, svtext)
+     + MIME::Fast::Stream->write_to_stream(stream_dst)
+     + MIME::Fast::Stream->length()
+     + MIME::Fast::Stream->set_bounds(start, end)
+     + MIME::Fast::Parser->new([mime_stream])
+     + MIME::Fast::Parser->init_with_stream(mime_stream)
+     + MIME::Fast::Parser->set_scan_from(scan_from)
+     + MIME::Fast::Parser->get_scan_from()
+     + MIME::Fast::Parser->tell()
+     + MIME::Fast::Parser->eos()
+     + MIME::Fast::Parser->get_from()
+     + MIME::Fast::Parser->get_from_offset()
+     + MIME::Fast::Utils::generate_message_id(fqdn)
+     + MIME::Fast::Utils::decode_message_id(message_id)
+
+   - MIME::Fast::Part is splited into Part and MultiPart
+   - MIME::Fast::Parser method construct_message has no argument now
+   - MIME::Fast::Hash::Header included from separate file Fast-Hash.xs
+   
+ * perl 5.8.x or higher required:
+   - uses XSINTERFACE_FUNC macros
+ * gmime 2.0.x updates:
+   - internet_address_unref instead of internet_address_destroy
+   - inheritance of objects in Fast.pm with @ISA arrays
+   - changed gchar variables to char type
+
+
+Wed, May 21 2003
+ * finished update to version 0.2 (to version 2.0.6 of gmime)
+
