@@ -1,4 +1,8 @@
 
+Fri, Jun 13 2003 (0.2.2)
+ * fixed a bug with foreach_part method (Thanks to 
+   Ramprasad A Padmanabhan for testing)
+
 Fri, Jun 13 2003 (0.2.1)
  * fixed problem with filehandles closed by gmime in MIME::Fast::Stream
 

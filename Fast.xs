@@ -2048,7 +2048,6 @@ g_mime_message_foreach_part(message, callback, svdata)
 	data = g_new0 (struct _user_data_sv, 1);
 	data->svuser_data = svdata;
 	data->svfunc = callback;
-        data = (gpointer)svdata;
         g_mime_message_foreach_part(message, call_sub_foreach, data);
 	g_free (data);
 
