@@ -103,7 +103,6 @@ static void
 g_mime_stream_perlio_finalize (GObject *object)
 {
 	GMimeStreamPerlIO *stream = (GMimeStreamPerlIO *) object;
-	
 	dTHX;
 	
 	if (stream->owner && stream->fp)
@@ -118,7 +117,6 @@ stream_read (GMimeStream *stream, char *buf, size_t len)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	ssize_t nread;
-
 	dTHX;
 	
 	if (stream->bound_end != -1 && stream->position >= stream->bound_end)
@@ -143,7 +141,6 @@ stream_write (GMimeStream *stream, char *buf, size_t len)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	ssize_t nwritten;
-
 	dTHX;
 	
 	if (stream->bound_end != -1 && stream->position >= stream->bound_end)
@@ -167,10 +164,9 @@ static int
 stream_flush (GMimeStream *stream)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
+	dTHX;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
-	
-	dTHX;
 	
 	return PerlIO_flush (fstream->fp);
 }
@@ -180,10 +176,9 @@ stream_close (GMimeStream *stream)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	int ret;
+	dTHX;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
-	
-	dTHX;
 	
 	ret = PerlIO_close (fstream->fp);
 	if (ret != -1)
@@ -196,10 +191,9 @@ static gboolean
 stream_eos (GMimeStream *stream)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
+	dTHX;
 
 	g_return_val_if_fail (fstream->fp != NULL, TRUE);
-	
-	dTHX;
 	
 	if (stream->bound_end == -1)
 		return PerlIO_eof (fstream->fp) ? TRUE : FALSE;
@@ -212,10 +206,9 @@ stream_reset (GMimeStream *stream)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	int ret;
+	dTHX;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
-	
-	dTHX;
 	
 	if (stream->position == stream->bound_start)
 		return 0;
@@ -233,10 +226,9 @@ stream_seek (GMimeStream *stream, off_t offset, GMimeSeekWhence whence)
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	off_t real = stream->position;
 	int ret;
+	dTHX;
 
 	g_return_val_if_fail (fstream->fp != NULL, -1);
-	
-	dTHX;
 	
 	switch (whence) {
 	case GMIME_STREAM_SEEK_SET:
@@ -284,7 +276,6 @@ stream_length (GMimeStream *stream)
 {
 	GMimeStreamPerlIO *fstream = (GMimeStreamPerlIO *) stream;
 	off_t bound_end;
-	
 	dTHX;
 	
 	if (stream->bound_start != -1 && stream->bound_end != -1)
@@ -327,7 +318,6 @@ GMimeStream *
 g_mime_stream_perlio_new (PerlIO *fp)
 {
 	GMimeStreamPerlIO *fstream;
-	
 	dTHX;
 	
 	fstream = g_object_new (GMIME_TYPE_STREAM_PERLIO, NULL, NULL);

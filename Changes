@@ -1,3 +1,6 @@
+Mon, Jul 28 2003 (1.1)
+ * fixed a bad position of pTHX in gmime-stream-perlio.c
+
 Mon, Jun 23 2003 (1.0.1)
  * polishing a code - drop unused variables, etc.
  * gmime-stream-perlio.c - fixed compilation problems with multithreaded perl
