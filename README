@@ -17,7 +17,7 @@ perl Makefile.PL
 make test
 make install
 
-REQUIREMENTS: This module MIME::Fast requires perl 5.8.x and gmime 2.0.9 or higher.
+REQUIREMENTS: This module MIME::Fast requires perl 5.8.x and gmime 2.1.9 or higher.
 The homepage of gmime C library is at http://spruce.sourceforge.net/gmime/
 The homepage of glib C library is at http://www.gtk.org/
 

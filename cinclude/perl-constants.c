@@ -246,7 +246,7 @@ constant_string(char *name, int len, int arg)
             return GMIME_RECIPIENT_TYPE_TO;
           else if (strEQ(name, "GMIME_RECIPIENT_TYPE_CC"))
             return GMIME_RECIPIENT_TYPE_CC;
-          else if (strEQ(name, "GMIME_RECIPIENT_TYPE_CC"))
+          else if (strEQ(name, "GMIME_RECIPIENT_TYPE_BCC"))
             return GMIME_RECIPIENT_TYPE_BCC;
           break;
         }

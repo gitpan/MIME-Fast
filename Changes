@@ -1,4 +1,7 @@
-Thu, Oct 16 2003 (1.5 bug fix release)
+Fri, Dec 17 2004 (1.6)
+ * very small spell mistake in perl-constants.c (GMIME_RECIPIENT_TYPE_[B]CC)
+
+Thu, Dec 16 2004 (1.5 bug fix release)
  * improvement patches made by Sergey Skvortsov - maintainer of FreeBSD port of MIME-Fast
  * fixed a problem with part->set_content_md5() reported by Sergey Skvortsov
 
