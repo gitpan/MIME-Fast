@@ -47,6 +47,7 @@ MIME::Fast::Filter::CRLF		T_PTROBJ
 MIME::Fast::Filter::From		T_PTROBJ
 MIME::Fast::Filter::Func		T_PTROBJ
 MIME::Fast::Filter::Enriched		T_PTROBJ
+MIME::Fast::Filter::Windows		T_PTROBJ
 MIME::Fast::Filter::HTML		T_PTROBJ
 MIME::Fast::Filter::Md5			T_PTROBJ
 MIME::Fast::Filter::Strip		T_PTROBJ

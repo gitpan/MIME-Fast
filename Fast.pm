@@ -44,7 +44,7 @@ our @EXPORT = qw(
 	INTERNET_ADDRESS_NAME
 	INTERNET_ADDRESS_GROUP
 );
-our $VERSION = '1.2';
+our $VERSION = '1.3';
 
 sub AUTOLOAD {
     # This AUTOLOAD is used to 'autoload' constants from the constant()

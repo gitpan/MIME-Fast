@@ -139,6 +139,9 @@ typedef GMimeMessageMDNDisposition *	MIME__Fast__MessageMDNDisposition;
 typedef GMimeFilterFunc *	MIME__Fast__Filter__Func;
 #endif
 typedef GMimeFilterEnriched *	MIME__Fast__Filter__Enriched;
+#if GMIME_CHECK_VERSION_2_1_0
+typedef GMimeFilterWindows *	MIME__Fast__Filter__Windows;
+#endif
 typedef InternetAddress *	MIME__Fast__InternetAddress;
 typedef GMimeDisposition *	MIME__Fast__Disposition;
 typedef GMimeContentType *	MIME__Fast__ContentType;
@@ -553,6 +556,13 @@ INCLUDE: Fast/Filter/Func.xs
 INCLUDE: Fast/Filter/HTML.xs
 INCLUDE: Fast/Filter/Md5.xs
 INCLUDE: Fast/Filter/Strip.xs
+
+#if GMIME_CHECK_VERSION_2_1_0
+
+INCLUDE: Fast/Filter/Windows.xs
+
+#endif
+
 INCLUDE: Fast/Filter/Yenc.xs
 INCLUDE: Fast/Parser.xs
 INCLUDE: Fast/Disposition.xs

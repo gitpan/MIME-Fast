@@ -36,6 +36,7 @@ Fast/Filter/Func.xs
 Fast/Filter/HTML.xs
 Fast/Filter/Md5.xs
 Fast/Filter/Strip.xs
+Fast/Filter/Windows.xs
 Fast/Filter/Yenc.xs
 Fast/Hash.xs
 Fast/InternetAddress.xs

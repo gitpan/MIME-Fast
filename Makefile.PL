@@ -7,12 +7,28 @@ require 5.8.0; # require perl v5.8.0 or higher
 # my $libs = `pkg-config --libs gmime-2.0`;
 my $libs = `gmime-config --libs`;
 my $vers = `gmime-config --version`;
+
+if ($libs eq '') {
+	die<<'END';
+ERROR: I could not find gmime-config file (and gmime libraries) on your system.
+You should have gmime (and glib) library installed.
+The homepage of gmime C library is at http://spruce.sourceforge.net/gmime/
+The homepage of glib C library is at http://www.gtk.org/
+END
+}
+
 chomp ($vers);
+print "Version of gmime: $vers\n";
 if ($vers eq "2.0.8") {
 	open(VERSIONFILE,"> gmime-version.h") || die "Can not open gmime-version.h to write";
 	print VERSIONFILE "#define GMIME_CHECK_VERSION_UNSUPPORTED 0\n";
 	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_8 1\n";
 	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_9 0\n";
+	close(VERSIONFILE);
+} elsif ($vers =~ /^2\.[1-9]/ or $vers =~ /^[3-9]/) {
+	open(VERSIONFILE,"> gmime-version.h") || die "Can not open gmime-version.h to write";
+	print VERSIONFILE "#define GMIME_CHECK_VERSION_UNSUPPORTED 0\n";
+	print VERSIONFILE "#define GMIME_CHECK_VERSION_2_1_0 1\n";
 	close(VERSIONFILE);
 } else {
 	# die "This version of MIME::Fast module can only run with gmime v2.0.8 (not $vers)\n";

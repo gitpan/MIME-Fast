@@ -8,8 +8,6 @@ use less memory and CPU resources than standard MIME (perl module),
 because MIME::Fast is the wrapper for C functions (calling C function
 is much, much less expensive than calling perl function).
 
-You should have gmime library installed.
-
 WARNING: this code is still in beta phase, and interface methods
 could change.
 
@@ -18,6 +16,10 @@ Install package with:
 perl Makefile.PL
 make test
 make install
+
+REQUIREMENTS: This module MIME::Fast requires perl 5.8.x and gmime 2.0.9 or higher.
+The homepage of gmime C library is at http://spruce.sourceforge.net/gmime/
+The homepage of glib C library is at http://www.gtk.org/
 
 Bugs and questions should be mailed to the author.
 

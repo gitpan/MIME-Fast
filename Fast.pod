@@ -1315,6 +1315,36 @@ end of the lines).
 
 =back
 
+=head2 MIME::Fast::Filter::Windows
+
+NOTE: MIME::Fast::Filter::Windows is available since gmime version 2.1.0.
+
+=over 4
+
+=item I<new> (claimed_charset)
+
+Creates a new MIME::Fast::Filter::Windows filter.
+When a stream of text has been filtered, it can be determined whether or not
+said text stream was in I<claimed_charset> or the equivalent Windows-CP125#
+charset.
+
+=item I<is_windows_charset> ()
+
+Determines whether or not a Windows-CP125# charset has been
+detected so far. Returns: true if the filtered stream has been detected to
+contain Windows-CP125# charset.
+
+=item I<real_charset> ()
+
+Figures out the real charset that the text is encoded in based on whether or
+not Windows-CP125# characters were found.
+
+Returns a const string pointer to the claimed charset if filtered
+text stream was found not to contain any Windows-CP125# characters
+or the proper Windows-CP125# charset.
+
+=back
+
 =head2 MIME::Fast::Filter::Yenc
 
 =over 4
@@ -1372,7 +1402,7 @@ E.g.
 
 =head1 REQUIREMENTS
 
-This module MIME::Fast requires perl 5.8.x and gmime 2.1.0 or higher.
+This module MIME::Fast requires perl 5.8.x and gmime 2.0.9 or higher.
 
 =head1 DEVELOPMENT
 
