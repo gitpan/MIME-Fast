@@ -8,11 +8,8 @@ off_t				T_IV
 gboolean			T_BOOL
 gpointer			T_PTR
 
-gchar				T_CHAR
-gchar *				T_PV
-const gchar *			T_PV
-guchar *			T_PV
-const guchar *			T_PV
+unsigned char *			T_PV
+const unsigned char *		T_PV
 const char *			T_PV
 
 # enums

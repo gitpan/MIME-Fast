@@ -391,8 +391,6 @@ gboolean
 g_mime_parser_get_scan_from(parser)
 	MIME::Fast::Parser	parser
 
-#if GMIME_CHECK_VERSION_2_0_9
-
 void
 g_mime_parser_set_persist_stream(parser, persist)
 	MIME::Fast::Parser	parser
@@ -401,8 +399,6 @@ g_mime_parser_set_persist_stream(parser, persist)
 gboolean
 g_mime_parser_get_persist_stream(parser)
 	MIME::Fast::Parser	parser
-
-#endif
 
 void
 g_mime_parser_set_header_regex(parser, regex, callback, svdata)

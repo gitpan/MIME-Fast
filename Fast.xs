@@ -137,10 +137,8 @@ typedef GMimeMessageDelivery *	MIME__Fast__MessageDelivery;
 typedef GMimeMessageMDN *	MIME__Fast__MessageMDN;
 typedef GMimeMessageMDNDisposition *	MIME__Fast__MessageMDNDisposition;
 typedef GMimeFilterFunc *	MIME__Fast__Filter__Func;
-#if GMIME_CHECK_VERSION_2_0_9
 #endif
 typedef GMimeFilterEnriched *	MIME__Fast__Filter__Enriched;
-#endif
 typedef InternetAddress *	MIME__Fast__InternetAddress;
 typedef GMimeDisposition *	MIME__Fast__Disposition;
 typedef GMimeContentType *	MIME__Fast__ContentType;
@@ -543,13 +541,7 @@ INCLUDE: Fast/Filter/Basic.xs
 INCLUDE: Fast/Filter/Best.xs
 INCLUDE: Fast/Filter/Charset.xs
 INCLUDE: Fast/Filter/CRLF.xs
-
-#if GMIME_CHECK_VERSION_2_0_9
-
 INCLUDE: Fast/Filter/Enriched.xs
-
-#endif
-
 INCLUDE: Fast/Filter/From.xs
 
 #if GMIME_CHECK_VERSION_UNSUPPORTED

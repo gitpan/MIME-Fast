@@ -1,6 +1,6 @@
 
 use strict;
-use Test::More tests => 32;
+use Test::More tests => 28;
 
 BEGIN { use_ok( 'MIME::Fast' ); }
 

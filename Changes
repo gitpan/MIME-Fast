@@ -1,3 +1,16 @@
+Wed, Oct 15 2003 (1.2)
+ * fixed problem with enriched filter when compiled with gmime-2.1.0 (Thanks to Patel, Rupen)
+ * update to gmime-2.1.0:
+   - MIME::Fast::Utils::8bit_header_decode split into
+     MIME::Fast::Utils::header_decode_text and MIME::Fast::Utils::header_decode_phrase
+   - MIME::Fast::Utils::8bit_header_encode renamed to
+     MIME::Fast::Utils::header_encode_text
+   - MIME::Fast::Utils::8bit_header_encode_phrase renamed to
+     MIME::Fast::Utils::header_encode_phrase
+   - MIME::Fast::Charset::locale_name renamed to
+     MIME::Fast::locale_charset
+   - new function MIME::Fast::locale_language
+
 Mon, Jul 28 2003 (1.1)
  * fixed a bad position of pTHX in gmime-stream-perlio.c
 

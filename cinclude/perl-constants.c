@@ -76,11 +76,9 @@ constant(char *name, int len, int arg)
             return GMIME_FILTER_CRLF_MODE_CRLF_DOTS;
           else if (strEQ(name, "GMIME_FILTER_CRLF_MODE_CRLF_ONLY"))
             return GMIME_FILTER_CRLF_MODE_CRLF_ONLY;
-#if GMIME_CHECK_VERSION_2_0_9
 	  /* gmime-filter-enriched.h */
           else if (strEQ(name, "GMIME_FILTER_ENRICHED_IS_RICHTEXT"))
             return GMIME_FILTER_ENRICHED_IS_RICHTEXT;
-#endif
 	  /* gmime-filter-from.h */
           else if (strEQ(name, "GMIME_FILTER_FROM_MODE_DEFAULT"))
             return GMIME_FILTER_FROM_MODE_DEFAULT;

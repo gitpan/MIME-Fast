@@ -11,15 +11,15 @@ chomp ($vers);
 if ($vers eq "2.0.8") {
 	open(VERSIONFILE,"> gmime-version.h") || die "Can not open gmime-version.h to write";
 	print VERSIONFILE "#define GMIME_CHECK_VERSION_UNSUPPORTED 0\n";
-	print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_8 1\n";
-	print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_9 0\n";
+	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_8 1\n";
+	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_9 0\n";
 	close(VERSIONFILE);
 } else {
 	# die "This version of MIME::Fast module can only run with gmime v2.0.8 (not $vers)\n";
 	open(VERSIONFILE,"> gmime-version.h") || die "Can not open gmime-version.h to write";
 	print VERSIONFILE "#define GMIME_CHECK_VERSION_UNSUPPORTED 0\n";
-	print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_8 0\n";
-	print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_9 1\n";
+	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_8 0\n";
+	# print VERSIONFILE "#define GMIME_CHECK_VERSION_2_0_9 1\n";
 	close(VERSIONFILE);
 }
 

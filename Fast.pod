@@ -808,19 +808,25 @@ Returns best (in means of compression size) encoding type for the
 given string. Look into description of MIME::Fast::Part::get_encoding()
 for possible return values.
 
-=item I<8bit_header_decode> (header)
+=item I<header_decode_text> (header)
 
-Deocded the given text header and returns 8bit string.
+Decodes an rfc2047 encoded 'text' header.
+Returns the decoded header (which will be in UTF-8 if at all possible).
 
-=item I<8bit_header_encode> (header)
+=item I<header_decode_phrase> (header)
 
-Returns the header as several encoded atoms. Useful for encoding headers like
-"Subject".
+Decodes an rfc2047 encoded 'phrase' header.
+Returns the decoded header (which will be in UTF-8 if at all possible).
 
-=item I<8bit_header_encode_phrase> (header)
+=item I<header_encode_text> (header)
 
-Returns the header phrase as 1 encoded atom. Useful for encoding internet
-addresses.
+Encodes a 'text' header according to the rules in rfc2047.
+Useful for encoding headers like "Subject".
+
+=item I<header_encode_phrase> (header)
+
+Encodes a 'phrase' header according to the rules in rfc2047.
+Useful for encoding internet addresses.
 
 =back
 
@@ -998,20 +1004,24 @@ iso-8859-1 locales. If you need iso-8859-2 charset, set LC_ALL
 locale variable to e.g. "pl_PL.iso-8859-2" string before calling
 this function.
 
-=item I<locale_name> ()
+=item I<MIME::Fast::locale_charset> ()
 
 Returns the user's locale charset (iso-8859-1 is default).
+
+=item I<MIME::Fast::locale_language> ()
+
+Returns the user's locale language code.
+
+=item I<language> (charset)
+
+Attempts to find a specific language code that is specific to
+charset. Currently only handles CJK and Russian/Ukranian
+charset->lang mapping. Everything else will return undef.
 
 =item I<map_init> ()
 
 Initializes the locale charset variable for later calls.
 Only really needs to be called for non-iso-8859-1 locales.
-
-=item I<language> ()
-
-Returns a language code that is specific to charset.
-
-B<NOTE>: this function is not yet available in gmime 2.0.8.
 
 =item I<best_name> ()
 
@@ -1234,9 +1244,6 @@ This filter can be used to convert text/enriched and text/rtf to text/html.
 optional $flags argument can have the following values:
 GMIME_FILTER_ENRICHED_IS_RICHTEXT (if the content is already enriched).
 
-B<NOTE>:
-The MIME::Fast::Filter::Enriched filter is not yet available in gmime 2.0.8.
-
 =back
 
 =head2 MIME::Fast::Filter::From
@@ -1279,7 +1286,7 @@ $flags argument can have the following values:
   GMIME_FILTER_HTML_ESCAPE_8BIT Converts 8bit characters to '?'.
   GMIME_FILTER_HTML_CITE        Cites text by prepending "> " to each cited line.
 
-Gmime version 2.0.8 supports only one colour for citation text.
+Gmime supports only one colour for citation text (as of version 2.0.8).
 
 =back
 
@@ -1365,7 +1372,7 @@ E.g.
 
 =head1 REQUIREMENTS
 
-This module MIME::Fast requires perl 5.8.x and gmime 2.0.8 or higher.
+This module MIME::Fast requires perl 5.8.x and gmime 2.1.0 or higher.
 
 =head1 DEVELOPMENT
 

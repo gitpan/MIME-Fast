@@ -124,16 +124,20 @@ g_mime_utils_best_encoding(str)
         RETVAL
 
 char *
-g_mime_utils_8bit_header_decode(in)
-        const guchar *	in
+g_mime_utils_header_decode_text(in)
+        const unsigned char *	in
 
 char *
-g_mime_utils_8bit_header_encode(in)
-        const guchar *	in
+g_mime_utils_header_decode_phrase(in)
+        const unsigned char *	in
 
 char *
-g_mime_utils_8bit_header_encode_phrase(in)
-        const guchar *	in
+g_mime_utils_header_encode_text(in)
+        const unsigned char *	in
+
+char *
+g_mime_utils_header_encode_phrase(in)
+        const unsigned char *	in
 
 # not implemented - incremental base64:
 #	g_mime_utils_base64_decode_step()
@@ -142,7 +146,7 @@ g_mime_utils_8bit_header_encode_phrase(in)
 #gint
 #g_mime_utils_base64_decode_step(in, out, state, save)
 #	SV *		in
-#	guchar *	out
+#	unsigned char *	out
 #	gint		state
 #	gint		&save
 #    PREINIT:
