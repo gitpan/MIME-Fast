@@ -845,9 +845,6 @@ at the end of line. RFC says that binary parts should be encoded with
 BASE64 not Q-P (it is also best compression for such parts).
 Then there is no harm.
 
-Closing a filehandle can fail (with gmime version <=2.0.8)
-if it is previously passed to the MIME::Fast::Stream or Parser.
-
 =head1 AUTHOR
 
 Piotr Klaban, post@klaban.torun.pl

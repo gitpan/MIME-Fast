@@ -1,5 +1,8 @@
 
-Thu, Jun 12 2003
+Fri, Jun 13 2003 (0.2.1)
+ * fixed problem with filehandles closed by gmime in MIME::Fast::Stream
+
+Thu, Jun 12 2003 (0.2)
  * finished fixing bugs, and update to gmime 2.0.8
  * Fast.xs:
    - new function constat_string for string constants

@@ -1677,10 +1677,42 @@ g_mime_part_set_content(mime_part, svmixed)
         svvaltype = SvTYPE(svval);
 
         if (svvaltype == SVt_PVGV) { // possible FILE * handle
-          FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
+	  PerlIO *pio;
+	  FILE *fp;
+	  int fd;
 
-          mime_stream = g_mime_stream_file_new(fp);
-	  g_mime_stream_file_set_owner (mime_stream, FALSE);
+	  pio = IoIFP(sv_2io(svval));
+	  if (!pio || !(fp = PerlIO_findFILE(pio))) {
+	    croak("MIME::Fast::Part::set_content: the argument you gave is not a FILE pointer");
+	  }
+	    
+	  fd = dup(fileno(fp));
+	  if (fd == -1)
+	    croak("MIME::Fast::Part::set_content: Can not duplicate a FILE pointer");
+
+          // mime_stream = g_mime_stream_file_new(fp);
+          mime_stream = g_mime_stream_fs_new(fd);
+	  if (!mime_stream) {
+	    close(fd);
+	    XSRETURN_UNDEF;
+          }
+	  // g_mime_stream_file_set_owner (mime_stream, FALSE);
+          mime_data_wrapper = g_mime_data_wrapper_new_with_stream(mime_stream, GMIME_PART_ENCODING_BASE64);
+          g_mime_part_set_content_object(mime_part, mime_data_wrapper);
+
+          g_mime_stream_unref(mime_stream);
+	} else if (svvaltype == SVt_PVMG) { // possible STDIN/STDOUT etc.
+          int fd0 = (int)SvIV( svval );
+	  int fd;
+
+	  if (fd0 < 0 || (fd = dup(fd0)) == -1)
+	    croak("MIME::Fast::Part::set_content: Can not duplicate a FILE pointer");
+
+          mime_stream = g_mime_stream_fs_new(fd);
+	  if (!mime_stream) {
+	    close(fd);
+	    XSRETURN_UNDEF;
+          }
           mime_data_wrapper = g_mime_data_wrapper_new_with_stream(mime_stream, GMIME_PART_ENCODING_BASE64);
           g_mime_part_set_content_object(mime_part, mime_data_wrapper);
 
@@ -3249,15 +3281,39 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svmixed)));
+	    PerlIO *pio;
+	    FILE *fp;
+	    int fd;
 
-            mime_stream = g_mime_stream_file_new(fp);
-	    g_mime_stream_file_set_owner (mime_stream, FALSE);
-	  } else if (svvaltype == SVt_PVMG) { // possible FILE * handle
-	    int fd = (int)SvIV( svval );
+	    pio = IoIFP(sv_2io(svval));
+	    if (!pio || !(fp = PerlIO_findFILE(pio))) {
+	      croak("MIME::Fast::Stream::new: the argument you gave is not a FILE pointer");
+	    }
+	    
+	    fd = dup(fileno(fp));
+	    if (fd == -1)
+	      croak("MIME::Fast::Stream::new: Can not duplicate a FILE pointer");
+
+            // mime_stream = g_mime_stream_file_new(fp);
+            mime_stream = g_mime_stream_fs_new(fd);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+	    // g_mime_stream_file_set_owner (mime_stream, FALSE);
+	  } else if (svvaltype == SVt_PVMG) { // possible STDIN/STDOUT etc.
+            int fd0 = (int)SvIV( svval );
+	    int fd;
+
+	    if (fd0 < 0 || (fd = dup(fd0)) == -1)
+	      croak("MIME::Fast::Stream::new: Can not duplicate a FILE pointer");
 
             mime_stream = g_mime_stream_fs_new(fd);
-	    g_mime_stream_fs_set_owner (mime_stream, FALSE);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+	    // g_mime_stream_fs_set_owner (mime_stream, FALSE);
           } else if (SvPOK(svval)) {
             data = (char *)SvPV(svmixed, len);
             mime_stream = g_mime_stream_mem_new_with_buffer(data,len);
@@ -3289,15 +3345,40 @@ g_mime_stream_new(Class, svmixed = 0, start = 0, end = 0)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
+	    PerlIO *pio;
+	    FILE *fp;
+	    int fd;
 
-            mime_stream = g_mime_stream_file_new_with_bounds(fp, start, end);
-	    g_mime_stream_file_set_owner (mime_stream, FALSE);
-	  } else if (svvaltype == SVt_PVMG) { // possible FILE * handle
-	    int fd = (int)SvIV( svval );
+	    pio = IoIFP(sv_2io(svval));
+	    if (!pio || !(fp = PerlIO_findFILE(pio))) {
+	      croak("MIME::Fast::Stream::new: the argument you gave is not a FILE pointer");
+	    }
+	    
+	    fd = dup(fileno(fp));
+	    if (fd == -1)
+	      croak("MIME::Fast::Stream::new: Can not duplicate a FILE pointer");
+
+
+            // mime_stream = g_mime_stream_file_new_with_bounds(fp, start, end);
+            mime_stream = g_mime_stream_fs_new_with_bounds(fd, start, end);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+	    // g_mime_stream_file_set_owner (mime_stream, FALSE);
+	  } else if (svvaltype == SVt_PVMG) { // possible STDIN/STDOUT etc.
+            int fd0 = (int)SvIV( svval );
+	    int fd;
+
+	    if (fd0 < 0 || (fd = dup(fd0)) == -1)
+	      croak("MIME::Fast::Stream::new: Can not duplicate a FILE pointer");
 
             mime_stream = g_mime_stream_fs_new_with_bounds(fd, start, end);
-	    g_mime_stream_fs_set_owner (mime_stream, FALSE);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+	    // g_mime_stream_fs_set_owner (mime_stream, FALSE);
 
           } else if (SvPOK(svval)) {
             warn ("stream_new: bounds for string are not supported");
@@ -3738,10 +3819,43 @@ g_mime_parser_construct_message(svmixed)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
+            //FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
+	    //int fd = dup(fileno(fp));
+	    PerlIO *pio;
+	    FILE *fp;
+	    int fd;
 
-            mime_stream = g_mime_stream_file_new(fp);
-	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+	    pio = IoIFP(sv_2io(svval));
+	    if (!pio || !(fp = PerlIO_findFILE(pio))) {
+	      croak("MIME::Fast::Parser::construct_message: the argument you gave is not a FILE pointer");
+	    }
+	    
+	    fd = dup(fileno(fp));
+	    if (fd == -1)
+	      croak("MIME::Fast::Parser::construct_message: Can not duplicate a FILE pointer");
+
+            // mime_stream = g_mime_stream_file_new(fp);
+	    // g_mime_stream_file_set_owner (mime_stream, FALSE);
+            mime_stream = g_mime_stream_fs_new(fd);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_msg = g_mime_parser_construct_message(parser);
+            g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
+	  } else if (svvaltype == SVt_PVMG) { // possible STDIN/STDOUT etc.
+            int fd0 = (int)SvIV( svval );
+	    int fd;
+
+	    if (fd0 < 0 || (fd = dup(fd0)) == -1)
+	      croak("MIME::Fast::Parser::construct_message: Can not duplicate a FILE pointer");
+            mime_stream = g_mime_stream_fs_new(fd);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
             parser = g_mime_parser_new_with_stream(mime_stream);
             mime_msg = g_mime_parser_construct_message(parser);
             g_mime_stream_unref(mime_stream);
@@ -3809,10 +3923,41 @@ g_mime_parser_construct_part(svmixed)
 
         if (mime_stream == NULL) {
           if (svvaltype == SVt_PVGV) { // possible FILE * handle
-            FILE *  fp = PerlIO_findFILE(IoIFP(sv_2io(svval)));
+	    PerlIO *pio;
+	    FILE *fp;
+	    int fd;
 
-            mime_stream = g_mime_stream_file_new(fp);
-	    g_mime_stream_file_set_owner (mime_stream, FALSE);
+	    pio = IoIFP(sv_2io(svval));
+	    if (!pio || !(fp = PerlIO_findFILE(pio))) {
+	      croak("MIME::Fast::Parser::construct_part: the argument you gave is not a FILE pointer");
+	    }
+	    
+	    fd = dup(fileno(fp));
+	    if (fd == -1)
+	      croak("MIME::Fast::Parser::construct_part: Can not duplicate a FILE pointer");
+            //mime_stream = g_mime_stream_file_new(fp);
+            mime_stream = g_mime_stream_fs_new(fd);
+	    if (!mime_stream) {
+	      close(fd);
+	      XSRETURN_UNDEF;
+            }
+	    // g_mime_stream_file_set_owner (mime_stream, FALSE);
+            parser = g_mime_parser_new_with_stream(mime_stream);
+            mime_object = g_mime_parser_construct_part(parser);
+            g_mime_stream_unref(mime_stream);
+	    g_object_unref (parser);
+	  } else if (svvaltype == SVt_PVMG) { // possible STDIN/STDOUT etc.
+            int fd0 = (int)SvIV( svval );
+	    int fd;
+
+	    if (fd0 < 0 || (fd = dup(fd0)) == -1)
+	      croak("MIME::Fast::Parser::construct_part: Can not duplicate a FILE pointer");
+
+            mime_stream = g_mime_stream_fs_new(fd);
+	    if (!mime_stream) {
+		close(fd);
+		XSRETURN_UNDEF;
+	    }
             parser = g_mime_parser_new_with_stream(mime_stream);
             mime_object = g_mime_parser_construct_part(parser);
             g_mime_stream_unref(mime_stream);
